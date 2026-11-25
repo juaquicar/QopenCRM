@@ -31,7 +31,8 @@ jobs:
           --health-retries 20
     env:
       DJANGO_SECRET_KEY: ci-only-not-secret
-      DJANGO_DEBUG: "0"
+      # como en desarrollo: con 0 los estáticos exigen un collectstatic previo
+      DJANGO_DEBUG: "1"
       POSTGRES_HOST: 127.0.0.1
       POSTGRES_PORT: "5432"
       POSTGRES_DB: qopencrm
