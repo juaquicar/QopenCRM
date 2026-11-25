@@ -1,0 +1,46 @@
+// App Android de QopenCRM: una Trusted Web Activity que abre la web publicada a pantalla completa.
+// No lleva código propio: toda la aplicación es la web. El dominio se verifica con /.well-known/assetlinks.json.
+plugins {
+    id 'com.android.application'
+}
+
+def crmHost = System.getenv("CRM_HOST") ?: "crm.example.com"
+
+android {
+    namespace "org.qopencrm.app"
+    compileSdk 36
+
+    defaultConfig {
+        applicationId "org.qopencrm.app"
+        minSdk 24
+        targetSdk 35
+        versionCode((System.getenv("APP_VERSION_CODE") ?: "1") as Integer)
+        versionName System.getenv("APP_VERSION_NAME") ?: "1.0.0"
+        manifestPlaceholders = [crmHost: crmHost]
+        resValue "string", "asset_statements",
+                "[{ \\\"relation\\\": [\\\"delegate_permission/common.handle_all_urls\\\"], \\\"target\\\": { \\\"namespace\\\": \\\"web\\\", \\\"site\\\": \\\"https://${crmHost}\\\" } }]"
+    }
+
+    signingConfigs {
+        release {
+            // La clave de firma no está en el repositorio: llega por variables de entorno (ver android/build.sh)
+            if (System.getenv("KEYSTORE_FILE")) {
+                storeFile file(System.getenv("KEYSTORE_FILE"))
+                storePassword System.getenv("KEYSTORE_PASSWORD")
+                keyAlias System.getenv("KEY_ALIAS") ?: "qopencrm"
+                keyPassword System.getenv("KEYSTORE_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+}
+
+dependencies {
+    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.7.4'
+}

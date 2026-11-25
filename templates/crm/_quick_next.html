@@ -1,0 +1,17 @@
+{# Próxima acción en dos toques: qué + cuándo. #}
+<form class="quick-next" hx-post="{% url 'task_quick' %}" hx-swap="none">
+  {% if opp %}<input type="hidden" name="opportunity" value="{{ opp.pk }}">{% else %}<input type="hidden" name="company" value="{{ company.pk }}">{% endif %}
+  <input name="title" placeholder="Próxima acción: llamar para…, enviar propuesta…" required aria-label="Próxima acción" maxlength="200">
+  <div class="when">
+    <label><input type="radio" name="quick" value="0">Hoy</label>
+    <label><input type="radio" name="quick" value="1" checked>Mañana</label>
+    <label><input type="radio" name="quick" value="3">En 3 días</label>
+    <label><input type="radio" name="quick" value="7">En 1 semana</label>
+    <label><input type="radio" name="quick" value="14">En 2 semanas</label>
+    <input type="date" name="date" aria-label="Otra fecha" style="width:auto;min-height:30px;padding:3px 10px;border-radius:99px;font-size:12.5px">
+  </div>
+  <div class="row">
+    <select name="assignee" aria-label="Responsable" style="width:auto;flex:1">{% for u in users %}<option value="{{ u.pk }}" {% if u.pk == user.pk %}selected{% endif %}>{{ u }}</option>{% endfor %}</select>
+    <button class="btn sm">Programar</button>
+  </div>
+</form>

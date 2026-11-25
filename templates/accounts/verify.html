@@ -1,0 +1,18 @@
+{% extends "base.html" %}{% load static %}
+{% block title %}Código de acceso · QopenCRM{% endblock %}
+{% block shell %}
+<div class="auth"><div class="gridbg"></div>
+  <div class="auth-card">
+    <img class="logo" src="{% static 'img/logo.png' %}" alt="QopenCRM">
+    <div><span class="eyebrow">Revisa tu correo</span><h1 style="margin-top:10px">Escribe el <em>código</em></h1></div>
+    <form class="panel" method="post" id="verify">{% csrf_token %}
+      <p class="muted">Si <b style="color:var(--fg)">{{ email }}</b> tiene acceso, ha recibido un código de 6 cifras. Vale 10 minutos y se envía uno como mucho cada 10 minutos: si ya te llegó uno hace poco, usa ese.</p>
+      {% if error %}<div class="alert">{{ error }}</div>{% endif %}
+      <input class="code-input" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9 ]*" maxlength="7" required autofocus aria-label="Código de 6 cifras" placeholder="······"
+             oninput="if(this.value.replace(/\D/g,'').length===6)this.form.requestSubmit()">
+      <button class="btn">Entrar</button>
+      <a class="link small" href="{% url 'login' %}" style="text-align:center">Usar otro correo</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

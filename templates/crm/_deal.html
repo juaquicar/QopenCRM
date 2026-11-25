@@ -1,0 +1,20 @@
+{% load crm %}
+<article class="deal prio-{{ o.priority }}{% if o.on_hold %} on-hold{% endif %}" data-move="{% url 'opportunity_move' o.pk %}" onclick="if(!event.target.closest('button,a'))location.href='{% url 'opportunity' o.pk %}'">
+  <div><div class="t">{{ o.title }}</div><div class="c truncate">{{ o.company }}</div></div>
+  <div class="amounts">
+    {% if o.amount_mrr %}<span><b>{{ o.amount_mrr|eur }}</b>/mes</span>{% endif %}
+    {% if o.amount_services %}<span><b>{{ o.amount_services|eur }}</b> horas</span>{% endif %}
+    {% if o.amount_one_off %}<span><b>{{ o.amount_one_off|eur }}</b> único</span>{% endif %}
+    {% if not o.amount_mrr and not o.amount_services and not o.amount_one_off %}<span class="muted">Sin importe</span>{% endif %}
+  </div>
+  <div class="foot">
+    {% if o.on_hold %}<span class="next {% if o.hold_overdue %}late{% else %}hold{% endif %}" title="{{ o.on_hold_reason }}"><span class="truncate">Parada</span><span class="when">· revisar {{ o.on_hold_until|short_date }}</span></span>
+    {% elif o.stage.is_open %}
+      {% with t=o.open_tasks.0 %}
+      {% if t %}<span class="next {{ t.due_at|due_class }}" title="{{ t.title }}"><span class="truncate">{{ t.title }}</span><span class="when">· {{ t.due_at|due }}</span></span>
+      {% else %}<button class="next none" data-modal="{% url 'task_next' o.pk %}">+ Próxima acción</button>{% endif %}
+      {% endwith %}
+    {% else %}<span class="chip {% if o.stage.is_won %}ok{% else %}bad{% endif %}">{{ o.stage }}{% if o.loss_reason %} · {{ o.loss_reason }}{% endif %}</span>{% endif %}
+    {% if o.owner %}<span class="avatar" title="{{ o.owner }}">{{ o.owner.initials }}</span>{% endif %}
+  </div>
+</article>

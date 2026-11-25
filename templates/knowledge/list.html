@@ -1,0 +1,18 @@
+{% extends "base.html" %}{% load crm %}
+{% block title %}Banco de conocimiento · QopenCRM{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><span class="eyebrow">Documentación interna</span><h1 style="margin-top:8px">Banco de conocimiento</h1>
+    <p class="lede">Programas de incentivos, protocolos, herramientas y guías de la empresa, en un solo sitio.</p></div>
+  {% if user.can_manage_knowledge %}<a class="btn" href="{% url 'article_new' %}">{% icon "plus" %}Documento</a>{% endif %}
+</div>
+<form class="filters" method="get"><div class="search"><input type="search" name="q" value="{{ q }}" placeholder="Buscar en títulos y contenido…" aria-label="Buscar" autofocus></div>
+  {% if q %}<a class="link small" href="{% url 'articles' %}">Quitar búsqueda</a><span class="muted small">{{ total }} resultado{{ total|pluralize }}</span>{% endif %}</form>
+{% for category, items in groups.items %}
+<h2 style="margin:18px 0 10px">{{ category }}</h2>
+<div class="kb-grid">{% for a in items %}<a class="card kb-card" href="{% url 'article' a.slug %}">
+  <div><b>{{ a.title }}</b>{% if a.pinned %} <span class="chip accent" style="margin-left:4px">Destacado</span>{% endif %}</div>
+  {% if a.summary %}<p class="muted small">{{ a.summary }}</p>{% endif %}
+  <span class="muted small">Actualizado {{ a.updated_at|short_date }}</span></a>{% endfor %}</div>
+{% empty %}<div class="empty">{% if q %}Nada con «{{ q }}».{% else %}Aún no hay documentos.{% endif %}</div>{% endfor %}
+{% endblock %}

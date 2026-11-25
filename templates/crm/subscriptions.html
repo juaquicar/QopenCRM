@@ -1,0 +1,31 @@
+{% extends "base.html" %}{% load crm %}
+{% block title %}Suscripciones y horas · QopenCRM{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><span class="eyebrow">Clientes en cartera</span><h1 style="margin-top:8px">Suscripciones y horas</h1></div>
+  {% if user.edits_all %}<div class="row"><button class="btn ghost" data-modal="{% url 'modal_new' 'hourbank' %}">{% icon "plus" %}Bolsa de horas</button><button class="btn" data-modal="{% url 'modal_new' 'subscription' %}">{% icon "plus" %}Suscripción</button></div>{% endif %}
+</div>
+<div class="split3" style="margin-bottom:16px">
+  <div class="stat"><span class="k">MRR activo</span><span class="v">{{ mrr|eur }} <small>/mes</small></span></div>
+  <div class="stat"><span class="k">Suscripciones activas</span><span class="v">{{ active_count }}</span></div>
+  <div class="stat"><span class="k">Bolsas de horas abiertas</span><span class="v">{{ banks|length }}</span></div>
+</div>
+<div class="grid cols-2">
+  <section class="card flush"><h2 style="padding:16px 16px 6px">Suscripciones</h2><div class="table-wrap"><table>
+    <thead><tr><th>Empresa</th><th>Plan</th><th class="r">MRR</th><th class="hide-m">Renueva</th><th></th></tr></thead>
+    <tbody>{% for s in subs %}<tr>
+      <td><a class="link" href="{% url 'company' s.company_id %}">{{ s.company }}</a></td>
+      <td><b>{{ s.plan_name }}</b><div class="muted small">{{ s.quantity|num }} × {{ s.unit_price|eur }} · {{ s.get_period_display|lower }}</div></td>
+      <td class="r num">{% if s.status == 'active' %}<b>{{ s.mrr|eur }}</b>{% else %}<span class="chip bad">{{ s.get_status_display }}</span>{% endif %}</td>
+      <td class="hide-m">{% if s.status == 'active' %}{{ s.renews_on|short_date }}{% else %}—{% endif %}</td>
+      <td class="r">{% if s.status == 'active' and user.edits_all %}<span class="row" style="justify-content:flex-end;flex-wrap:nowrap"><button class="btn ghost sm" data-modal="{% url 'subscription_change' s.pk %}">Cambiar</button>
+        <form method="post" action="{% url 'subscription_cancel' s.pk %}" onsubmit="return confirm('¿Dar de baja esta suscripción?')">{% csrf_token %}<button class="btn danger sm">Baja</button></form></span>{% endif %}</td>
+    </tr>{% empty %}<tr><td colspan="5"><div class="empty">Sin suscripciones. Se crean solas al ganar una oportunidad con líneas recurrentes.</div></td></tr>{% endfor %}</tbody></table></div></section>
+  <section class="card"><h2>Bolsas de horas</h2>
+    {% for b in banks %}<div style="padding:10px 0;border-bottom:1px solid var(--line)"><div class="spread"><div><b>{{ b.name }}</b><div class="muted small"><a class="link" href="{% url 'company' b.company_id %}">{{ b.company }}</a></div></div><span class="num">{{ b.hours_used|num }} / {{ b.hours_sold|num }} h</span></div>
+      <div class="bar" style="margin-top:6px"><i style="width:{{ b.used_pct }}%;{% if b.used_pct >= 90 %}background:var(--bad){% elif b.used_pct >= 70 %}background:var(--warn){% endif %}"></i></div>
+      <div class="spread small muted" style="margin-top:4px"><span>Quedan {{ b.hours_left|num }} h{% if b.closed %} · cerrada{% endif %}</span><span class="row"><button class="link small" data-modal="{% url 'modal_new' 'hourentry' %}?bank={{ b.pk }}">Apuntar horas</button>{% if user.edits_all %}<button class="link small" data-modal="{% url 'modal_edit' 'hourbank' b.pk %}">Editar</button>{% endif %}</span></div></div>
+    {% empty %}<div class="empty">Sin bolsas de horas. Se crean al ganar una oportunidad con líneas por hora.</div>{% endfor %}
+  </section>
+</div>
+{% endblock %}

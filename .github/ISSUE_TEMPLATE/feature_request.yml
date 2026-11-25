@@ -1,0 +1,27 @@
+name: Propuesta
+description: Una función nueva o una mejora
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Qué problema quieres resolver
+      description: La situación concreta, antes que la solución.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Cómo te lo imaginas
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternativas que has considerado
+  - type: checkboxes
+    id: help
+    attributes:
+      label: ¿Te animas?
+      options:
+        - label: Podría enviar una pull request

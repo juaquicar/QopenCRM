@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Vulnerabilidad de seguridad
+    url: https://github.com/juaquicar/QopenCRM/security/advisories/new
+    about: Aviso privado. No abras una incidencia pública.
+  - name: Documentación
+    url: https://github.com/juaquicar/QopenCRM#documentación
+    about: Instalación, configuración, IA y MCP, API y desarrollo.

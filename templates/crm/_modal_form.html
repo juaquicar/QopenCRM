@@ -1,0 +1,34 @@
+{% load crm %}
+<form hx-post="{{ action }}" hx-target="#modal-body" hx-swap="innerHTML" {% if wide %}data-wide{% endif %} novalidate>
+  <header><h2>{{ title }}</h2><button type="button" class="iconbtn" data-close aria-label="Cerrar">{% icon "x" %}</button></header>
+  <div class="content">
+    {% if hint %}<p class="muted small" style="margin-bottom:12px">{{ hint }}</p>{% endif %}
+    {% if ai_kind %}<details class="ai-fill" style="margin-bottom:12px"><summary class="link small">✦ Rellenar con IA desde un texto</summary>
+      <div class="stack" style="gap:8px;margin-top:8px"><textarea id="ai-text" rows="4" placeholder="Pega una firma de correo, una tarjeta o un párrafo de su web…" aria-label="Texto para la IA"></textarea>
+      <div class="row"><button type="button" class="btn ghost sm" data-ai-fill="{% url 'ai_extract' ai_kind %}">Rellenar campos</button><span class="muted small" id="ai-status">Solo se envía este texto al proveedor de IA. Revisa los datos antes de guardar.</span></div></div></details>{% endif %}
+    {% if form.non_field_errors %}<div class="alert" style="margin-bottom:12px">{{ form.non_field_errors }}</div>{% endif %}
+    <div class="form-grid {% if wide %}two{% endif %}">
+      {% for field in form %}
+        {% if field.is_hidden %}{{ field }}
+        {% elif field.widget_type == "checkbox" %}
+          <div class="field check">{{ field }}<label for="{{ field.id_for_label }}">{{ field.label }}</label>{% for e in field.errors %}<span class="err">{{ e }}</span>{% endfor %}</div>
+        {% else %}
+          <div class="field {% if field.widget_type == 'textarea' or field.widget_type == 'checkboxselectmultiple' or field.name == 'title' or field.name == 'name' %}full{% endif %}" {% if field.name|slice:":12" == "new_contact_" %}data-new-contact {% if not form.new_contact_first_name.value %}hidden{% endif %}{% endif %} {% if field.name == "new_company_event" %}data-new-company {% if not form.new_company.value %}hidden{% endif %}{% endif %}>
+            <label for="{{ field.id_for_label }}">{{ field.label }}{% if not field.field.required and not field.field.mandatory %} <span class="muted">· opcional</span>{% endif %}</label>
+            {{ field }}
+            {% if field.name == "product" and line_prices %}<span class="help" id="line-hint"></span>{% endif %}
+            {% if field.help_text %}<span class="help">{{ field.help_text }}</span>{% endif %}
+            {% for e in field.errors %}<span class="err">{{ e }}</span>{% endfor %}
+          </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+    {% if line_prices %}{{ line_prices|json_script:"line-prices" }}{% endif %}
+  </div>
+  <footer>
+    {% if delete_url %}<button type="button" class="btn danger sm left" hx-post="{{ delete_url }}" hx-confirm="¿Borrar definitivamente?" hx-swap="none">Borrar</button>{% endif %}
+    {% if erase_url %}<button type="button" class="btn danger sm" hx-post="{{ erase_url }}" hx-confirm="Se borrarán sus datos personales y quedará constancia en el registro. No se puede deshacer. ¿Suprimir?" hx-swap="none" title="Derecho de supresión (RGPD)">Suprimir datos (RGPD)</button>{% endif %}
+    <button type="button" class="btn ghost" data-close>Cancelar</button>
+    {% if not no_submit %}<button class="btn">{{ submit|default:"Guardar" }}</button>{% endif %}
+  </footer>
+</form>

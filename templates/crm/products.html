@@ -1,0 +1,26 @@
+{% extends "base.html" %}{% load crm %}
+{% block title %}Productos · QopenCRM{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><span class="eyebrow">Catálogo</span><h1 style="margin-top:8px">Productos</h1>
+    <p class="lede">Tres modelos de cobro: recurrente, por hora y pago único. Los productos sin tarifa cerrada se presupuestan a consultar.</p></div>
+  {% if user.can_manage_catalog %}<div class="row"><button class="btn ghost" data-modal="{% url 'modal_new' 'family' %}">{% icon "plus" %}Familia</button><button class="btn" data-modal="{% url 'modal_new' 'product' %}">{% icon "plus" %}Producto</button></div>{% endif %}
+</div>
+<form class="filters" method="get"><div class="search"><input type="search" name="q" value="{{ q }}" placeholder="Buscar producto…" aria-label="Buscar"></div></form>
+{% regroup products by family as groups %}
+<div class="stack">
+{% for g in groups %}<section class="card flush">
+  <div class="spread" style="padding:14px 16px 4px"><h2 style="display:flex;align-items:center;gap:10px"><span style="width:10px;height:10px;border-radius:50%;background:{{ g.grouper.color|default:'var(--none)' }}"></span>{{ g.grouper|default:"Sin familia" }}</h2>
+    {% if g.grouper and user.can_manage_catalog %}<button class="link small" data-modal="{% url 'modal_edit' 'family' g.grouper.pk %}">Editar familia</button>{% endif %}</div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Producto</th><th>Cobro</th><th class="r">Precio</th><th class="r hide-m">Anual</th><th class="hide-m">Estado</th></tr></thead>
+    <tbody>{% for p in g.list %}<tr class="{% if user.can_manage_catalog %}click{% endif %}" {% if user.can_manage_catalog %}data-modal="{% url 'modal_edit' 'product' p.pk %}"{% endif %}>
+      <td><b>{{ p.name }}</b>{% if p.is_addon %} <span class="chip">Extra</span>{% endif %}<div class="muted small">{{ p.code }}{% if p.description %} · {{ p.description|truncatechars:90 }}{% endif %}</div></td>
+      <td><span class="chip {% if p.billing_model == 'monthly' %}cyan{% elif p.billing_model == 'hourly' %}warn{% endif %}">{{ p.get_billing_model_display }}</span></td>
+      <td class="r num">{% if p.price is None %}<span class="muted">A consultar</span>{% else %}<b>{{ p.price|eur }}</b> <span class="muted small">/{{ p.unit }}</span>{% endif %}</td>
+      <td class="r num hide-m">{% if p.price_annual is None %}—{% else %}{{ p.price_annual|eur }}{% endif %}</td>
+      <td class="hide-m"><span class="chip {% if p.status == 'active' %}ok{% elif p.status == 'draft' %}warn{% endif %}">{{ p.get_status_display }}</span></td>
+    </tr>{% endfor %}</tbody></table></div>
+</section>{% empty %}<div class="empty">Catálogo vacío. Crea el primer producto con el botón de arriba.</div>{% endfor %}
+</div>
+{% endblock %}

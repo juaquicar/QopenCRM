@@ -1,0 +1,36 @@
+{% extends "base.html" %}{% load crm %}
+{% block title %}{{ event }} · QopenCRM{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div class="grow"><a class="eyebrow" href="{% url 'events' %}">Ferias y eventos</a><h1 style="margin-top:8px">{{ event.name }}</h1>
+    <div class="row" style="margin-top:10px">
+      <span class="chip {% if event.kind == 'fair' %}accent{% elif event.kind == 'event' %}cyan{% endif %}">{{ event.get_kind_display }}</span>
+      {% if event.starts_on %}<span class="chip">{{ event.starts_on|date:"d/m/Y" }}{% if event.ends_on and event.ends_on != event.starts_on %} – {{ event.ends_on|date:"d/m/Y" }}{% endif %}</span>{% endif %}
+      {% if event.place %}<span class="chip">{{ event.place }}</span>{% endif %}
+      {% if event.website %}<a class="chip cyan" href="{% if '://' not in event.website %}https://{% endif %}{{ event.website }}" target="_blank" rel="noopener">{{ event.website }}</a>{% endif %}
+    </div></div>
+  <div class="row">{% if can_edit %}<button class="btn ghost" data-modal="{% url 'modal_edit' 'event' event.pk %}">{% icon "edit" %}Editar</button>{% endif %}
+    <button class="btn" data-modal="{% url 'modal_new' 'company' %}?event={{ event.pk }}">{% icon "plus" %}Empresa conocida aquí</button></div>
+</div>
+<div class="card flush stats" style="margin-bottom:16px"><div class="grid cols-4" style="gap:0">
+  <div style="padding:16px"><span class="eyebrow">Empresas</span><div class="num" style="font-size:26px;font-weight:600">{{ companies|length }}</div></div>
+  <div style="padding:16px"><span class="eyebrow">Oportunidades abiertas</span><div class="num" style="font-size:26px;font-weight:600">{{ totals.open }}</div></div>
+  <div style="padding:16px"><span class="eyebrow">Ganadas</span><div class="num" style="font-size:26px;font-weight:600">{{ totals.won }}</div></div>
+  <div style="padding:16px"><span class="eyebrow">En juego</span><div class="num" style="font-size:20px;font-weight:600">{{ totals.mrr|eur }}/mes</div><div class="muted small">+ {{ totals.one_off|eur }} en horas y pago único</div></div>
+</div></div>
+{% if event.notes %}<section class="card" style="margin-bottom:16px"><h2>Notas</h2><p style="white-space:pre-line">{{ event.notes }}</p></section>{% endif %}
+<div class="grid cols-2">
+  <section class="card flush"><div style="padding:16px 16px 6px"><h2>Empresas conocidas aquí</h2></div>
+    {% if companies %}<div class="table-wrap"><table><thead><tr><th>Empresa</th><th>Tipo</th><th class="r">Abiertas</th><th class="hide-m">Resp.</th></tr></thead>
+      <tbody>{% for c in companies %}<tr class="click" data-href="{% url 'company' c.pk %}"><td><b>{{ c.name }}</b><div class="muted small">{{ c.city }}</div></td>
+        <td><span class="chip {% if c.kind == 'customer' %}ok{% elif c.kind == 'prospect' %}cyan{% endif %}">{{ c.get_kind_display }}</span></td>
+        <td class="r num">{{ c.n_open }}</td><td class="hide-m">{{ c.owner|default:"—" }}</td></tr>{% endfor %}</tbody></table></div>
+    {% else %}<p class="muted small" style="padding:0 16px 16px">Ninguna empresa asignada todavía. Edita una empresa y elige esta feria en «Conocida en».</p>{% endif %}
+  </section>
+  <section class="card"><h2>Oportunidades</h2>
+    {% for o in opps %}<div class="task"><div class="grow"><a class="link" href="{% url 'opportunity' o.pk %}"><b>{{ o.title }}</b></a>
+      <div class="meta"><span>{{ o.company.name }}</span><span>{{ o.stage.name }}</span>{% if o.amount_mrr %}<span>{{ o.amount_mrr|eur }}/mes</span>{% endif %}{% if o.amount_one_off %}<span>{{ o.amount_one_off|eur }} único</span>{% endif %}</div></div></div>
+    {% empty %}<p class="muted small">Sin oportunidades todavía con estas empresas.</p>{% endfor %}
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,67 @@
+{% load crm %}<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><title>Presupuesto {{ quote.number }} v{{ quote.version }}</title>
+<style>
+@font-face{font-family:"Lexend Deca"; src:url("file://{{ fonts }}/LexendDeca.ttf"); font-weight:100 900}
+@page{size:A4; margin:16mm 16mm 26mm 16mm;
+  @bottom-center{content:"{{ footer|escapejs }}" "\A" "Página " counter(page) " de " counter(pages); white-space:pre-line; text-align:center; font:300 8.5pt/1.7 "Lexend Deca","DejaVu Sans",sans-serif; color:#3b4252; border-top:.5pt solid #374151; padding-top:3mm; width:100%; vertical-align:top}}
+*{box-sizing:border-box}
+body{margin:0; font:300 9.5pt/1.45 "Lexend Deca","DejaVu Sans",sans-serif; color:#1f2430}
+b,strong,th{font-weight:600; color:#111}
+.head{display:flex; gap:9mm; align-items:flex-start; min-height:38mm}
+.head img{width:30mm; max-height:34mm; object-fit:contain}
+.issuer{padding-top:2mm; white-space:pre-line}
+.issuer b{display:block; font-size:12.5pt; margin-bottom:5mm}
+.parties{display:flex; justify-content:space-between; gap:10mm; margin-top:9mm}
+.billto{white-space:pre-line; max-width:95mm}
+.billto b{display:block}
+.doc{text-align:right}
+.doc h1{font-size:16pt; font-weight:600; margin:0 0 5mm; color:#111}
+.intro{white-space:pre-line; margin-top:9mm}
+table.lines{width:100%; border-collapse:collapse; margin-top:10mm}
+table.lines th{text-align:left; font-size:10pt; padding:0 1.5mm 2.5mm; border-bottom:.8pt solid #374151}
+table.lines td{padding:3.5mm 1.5mm; border-bottom:.5pt dotted #9aa1ad; vertical-align:middle}
+table.lines td.d{vertical-align:top; font-size:9pt}
+table.lines ul{margin:0; padding-left:5mm; font-size:8.3pt}
+table.lines .muted{color:#6b7280; font-size:8.3pt}
+.r{text-align:right; white-space:nowrap}
+.c{text-align:center; white-space:nowrap}
+tr{break-inside:avoid}
+.totals{margin:10mm 0 0 auto; width:62mm; border-collapse:collapse; break-inside:avoid}
+.totals td{padding:2.6mm 1mm; border-top:.5pt dotted #9aa1ad}
+.totals tr:first-child td,.totals tr:last-child td{border-top:.8pt solid #374151}
+.split{margin:3mm 0 0 auto; width:62mm; font-size:7.6pt; color:#6b7280; text-align:right; break-inside:avoid}
+.notes{margin-top:10mm; font-size:8.3pt; white-space:pre-wrap; break-inside:avoid}
+.notes b{display:block; font-size:9pt}
+.valid{margin-top:5mm; font-size:8.3pt; color:#6b7280}
+</style></head><body>
+<header class="head">
+  <img src="file://{{ logo }}" alt="">
+  <div class="issuer"><b>{{ issuer_name }}</b>{{ issuer_address }}</div>
+</header>
+<section class="parties">
+  <div class="billto"><b>Dirección de facturación y de envío</b>{{ bill_to }}</div>
+  <div class="doc"><h1>Presupuesto {{ quote.number }}</h1>
+    {% if quote.title %}<div><b>Descripción:</b> {{ quote.title }}</div>{% endif %}
+    <div><b>Fecha:</b> {{ quote.issued_on|date:"d/m/Y" }}</div>
+    {% if quote.version > 1 %}<div><b>Versión:</b> {{ quote.version }}</div>{% endif %}</div>
+</section>
+{% if quote.intro %}<div class="intro">{{ quote.intro }}</div>{% endif %}
+<table class="lines">
+  <thead><tr><th>Descripción</th><th class="c">Cantidad</th><th class="r">Precio/ud.</th><th class="c">Desc.(%)</th><th class="r">Precio</th></tr></thead>
+  <tbody>{% for l in quote.lines %}<tr>
+    <td class="d">{{ l.description|quote_desc }}{% if l.billing_model == "monthly" %}<div class="muted">Cuota {% if l.period == "annual" %}anual{% else %}mensual{% endif %}</div>{% elif l.billing_model == "hourly" %}<div class="muted">Por horas: se factura según consumo</div>{% endif %}</td>
+    <td class="c">{{ l.quantity|num }}{% if l.billing_model == "hourly" %} h{% endif %}</td>
+    <td class="r">{% if l.unit_price is None %}A consultar{% else %}{{ l.unit_price|amount }}{% endif %}</td>
+    <td class="c">{{ l.discount|num }}</td>
+    <td class="r">{% if l.unit_price is None %}—{% else %}{{ l.total|amount }}{% endif %}</td>
+  </tr>{% endfor %}</tbody>
+</table>
+<table class="totals">
+  <tr><td><b>Base Imponible</b></td><td class="r">{{ quote.base|amount }}</td></tr>
+  <tr><td>Impuestos ({{ quote.tax_rate|num }} %)</td><td class="r">{{ quote.tax|amount }}</td></tr>
+  <tr><td><b>Total</b></td><td class="r">{{ quote.total|amount }}</td></tr>
+</table>
+{% if quote.is_mixed %}<div class="split">{{ quote.breakdown|join:" · " }}<br>Importes en euros, sin IVA</div>{% endif %}
+{% if quote.terms %}<div class="notes"><b>Notas:</b>{{ quote.terms }}</div>{% endif %}
+{% if quote.valid_until %}<div class="valid">Presupuesto válido hasta el {{ quote.valid_until|date:"d/m/Y" }}.</div>{% endif %}
+</body></html>

@@ -1,0 +1,56 @@
+{% extends "base.html" %}{% load crm %}
+{% block title %}{% if previous %}Editar {{ previous.number }}{% else %}Nuevo presupuesto{% endif %} · QopenCRM{% endblock %}
+{% block content %}
+<div class="page-head"><div><a class="eyebrow" href="{% if previous %}{% url 'quote' previous.pk %}{% else %}{% url 'quotes' %}{% endif %}">{% if previous %}{{ previous }}{% else %}Presupuestos{% endif %}</a>
+  <h1 style="margin-top:8px">{% if previous %}Nueva versión{% else %}Nuevo presupuesto{% endif %}</h1>
+  <p class="lede">{{ opp.company.name }} · {{ opp.title }}.{% if previous %} Al guardar se crea la versión siguiente de {{ previous.number }}; la v{{ previous.version }} se conserva intacta.{% endif %}</p></div></div>
+{% if error %}<div class="alert" style="margin-bottom:16px"><b>No se ha guardado.</b> <span>{{ error }}</span></div>{% endif %}
+<form method="post" class="stack quote-editor" id="quote-editor">{% csrf_token %}
+  <div class="grid cols-2">
+    <section class="card stack">
+      <h2>Documento</h2>
+      <div class="form-grid two">
+        <div class="field"><label for="q-number">Número</label><input id="q-number" name="number" value="{{ data.number }}" maxlength="20" {% if previous %}readonly{% endif %}>
+          <span class="help">{% if previous %}El número no cambia entre versiones.{% else %}Propuesto automáticamente; cámbialo si sigues otra numeración.{% endif %}</span></div>
+        <div class="field"><label for="q-template">Plantilla</label><select id="q-template" name="template">{% for t in templates %}<option value="{{ t.pk }}" {% if t == template %}selected{% endif %}>{{ t.name }}</option>{% endfor %}</select>
+          <span class="help">Aporta el emisor y el pie de página.</span></div>
+        <div class="field full"><label for="q-title">Descripción</label><input id="q-title" name="title" value="{{ data.title }}" maxlength="200" placeholder="Módulo de inventario"></div>
+        <div class="field"><label for="q-issued">Fecha</label><input id="q-issued" type="date" name="issued_on" value="{{ data.issued_on|date:'Y-m-d'|default:data.issued_on }}" required></div>
+        <div class="field"><label for="q-valid">Válido hasta · opcional</label><input id="q-valid" type="date" name="valid_until" value="{{ data.valid_until|date:'Y-m-d'|default:data.valid_until|default:'' }}"></div>
+      </div>
+    </section>
+    <section class="card stack">
+      <h2>Cliente</h2>
+      <div class="field"><label for="q-billto">Dirección de facturación y de envío</label><textarea id="q-billto" name="bill_to" rows="5">{{ data.bill_to }}</textarea>
+        <span class="help">Razón social, dirección y CIF, una cosa por línea. Sale tal cual en el PDF.</span></div>
+    </section>
+  </div>
+
+  <section class="card">
+    <div class="spread"><h2>Líneas</h2>
+      <div class="row"><select id="q-catalog" aria-label="Añadir del catálogo" style="width:auto;max-width:260px"><option value="">Añadir del catálogo…</option>{% for p in catalog %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select>
+        <button type="button" class="btn ghost sm" data-quote-add>{% icon "plus" %}Línea libre</button></div></div>
+    <div class="table-wrap"><table class="quote-lines">
+      <thead><tr><th>Descripción</th><th>Cobro</th><th class="r">Cantidad</th><th class="r">Precio/ud.</th><th class="r">Desc. %</th><th class="r">Importe</th><th></th></tr></thead>
+      <tbody id="quote-rows">{% for l in data.lines %}{% include "crm/_quote_row.html" %}{% endfor %}</tbody>
+    </table></div>
+    <p class="muted small" style="margin-top:10px">En la descripción, las líneas que empiezan por guion (-) salen como lista de puntos. Deja el precio vacío para «A consultar».</p>
+    <div class="quote-totals"><dl class="kv num"><dt>Base imponible</dt><dd><b id="q-base">—</b></dd>
+      <dt>Impuestos <input name="tax_rate" id="q-tax" value="{{ data.tax_rate|num }}" inputmode="decimal" aria-label="IVA %" style="width:64px;min-height:28px;padding:2px 8px;display:inline-block"> %</dt><dd id="q-taxamount">—</dd>
+      <dt>Total</dt><dd><b id="q-total">—</b></dd></dl></div>
+  </section>
+
+  <div class="grid cols-2">
+    <section class="card stack"><h2>Notas</h2>
+      <div class="field"><label for="q-terms">Se imprimen al pie del presupuesto</label><textarea id="q-terms" name="terms" rows="8" placeholder="> Incluye:&#10;   * …">{{ data.terms }}</textarea></div></section>
+    <section class="card stack"><h2>Presentación</h2>
+      <div class="field"><label for="q-intro">Texto antes de la tabla · opcional</label><textarea id="q-intro" name="intro" rows="8">{{ data.intro }}</textarea></div></section>
+  </div>
+
+  <div class="row quote-actions"><button class="btn">{% if previous %}Guardar como versión nueva{% else %}Crear presupuesto{% endif %}</button>
+    <a class="btn ghost" href="{% if previous %}{% url 'quote' previous.pk %}{% else %}{% url 'quotes' %}{% endif %}">Cancelar</a>
+    <span class="muted small">Se genera el PDF al guardar.</span></div>
+</form>
+<template id="quote-row-template">{% include "crm/_quote_row.html" with l=None %}</template>
+{{ catalog|json_script:"quote-catalog" }}
+{% endblock %}

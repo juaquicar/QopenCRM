@@ -1,0 +1,12 @@
+{% extends "base.html" %}{% load static %}
+{% block title %}No se puede autorizar · QopenCRM{% endblock %}
+{% block shell %}
+<div class="auth"><div class="gridbg"></div>
+  <div class="auth-card">
+    <img class="logo" src="{% static 'img/logo.png' %}" alt="QopenCRM">
+    <div><span class="eyebrow">Conectar un asistente</span><h1 style="margin-top:10px;font-size:clamp(24px,3vw,32px)">No se puede autorizar</h1></div>
+    <div class="panel"><p>{{ error }}</p><p class="muted small">Vuelve a la aplicación e inicia la conexión de nuevo. Si persiste, avisa a quien administra el CRM.</p>
+      <a class="btn ghost" href="{% url 'home' %}">Ir al CRM</a></div>
+  </div>
+</div>
+{% endblock %}

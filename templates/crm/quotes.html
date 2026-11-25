@@ -1,0 +1,33 @@
+{% extends "base.html" %}{% load crm %}
+{% block title %}Presupuestos · QopenCRM{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><span class="eyebrow">Ofertas</span><h1 style="margin-top:8px">Presupuestos</h1>
+    <p class="lede">La última versión de cada presupuesto. Editar uno crea su siguiente versión; ninguna se borra.</p></div>
+  <a class="btn" href="{% url 'quote_new' %}">{% icon "plus" %}Presupuesto</a>
+</div>
+<form class="filters" method="get">
+  <div class="search"><input type="search" name="q" value="{{ q }}" placeholder="Buscar por número, descripción o empresa…" aria-label="Buscar"></div>
+  <select name="status" aria-label="Estado" onchange="this.form.submit()"><option value="">Cualquier estado</option>{% for v, l in statuses %}<option value="{{ v }}" {% if v == status %}selected{% endif %}>{{ l }}</option>{% endfor %}</select>
+  {% if q or status %}<a class="link small" href="{% url 'quotes' %}">Quitar filtros</a>{% endif %}
+</form>
+{% if page.object_list %}
+<div class="card flush"><div class="table-wrap"><table>
+  <thead><tr><th>Presupuesto</th><th>Empresa</th><th class="hide-m">Fecha</th><th class="r">Base imponible</th><th>Estado</th><th class="hide-m">Autor</th><th></th></tr></thead>
+  <tbody>{% for quote in page %}<tr class="click" data-href="{% url 'quote' quote.pk %}">
+    <td><b>{{ quote.number }}</b> <span class="chip">v{{ quote.version }}</span><div class="muted small">{{ quote.title|default:quote.opportunity.title }}</div></td>
+    <td>{{ quote.opportunity.company.name }}</td>
+    <td class="hide-m">{{ quote.issued_on|short_date }}</td>
+    <td class="r num"><b>{{ quote.base|eur }}</b></td>
+    <td><span class="chip {% if quote.status == 'accepted' %}ok{% elif quote.status == 'sent' %}cyan{% elif quote.status == 'rejected' %}bad{% endif %}">{{ quote.get_status_display }}</span></td>
+    <td class="hide-m">{{ quote.created_by.name|default:"—" }}</td>
+    <td class="r"><a class="iconbtn" style="display:inline-grid" href="{% url 'quote_pdf' quote.pk %}" target="_blank" title="Abrir PDF" aria-label="Abrir PDF">{% icon "pdf" %}</a></td>
+  </tr>{% endfor %}</tbody>
+</table></div></div>
+{% if page.has_other_pages %}<div class="row" style="margin-top:14px;justify-content:center">
+  {% if page.has_previous %}<a class="btn ghost sm" href="{% qs page=page.previous_page_number %}">Anteriores</a>{% endif %}
+  <span class="muted small">Página {{ page.number }} de {{ page.paginator.num_pages }}</span>
+  {% if page.has_next %}<a class="btn ghost sm" href="{% qs page=page.next_page_number %}">Siguientes</a>{% endif %}</div>{% endif %}
+{% else %}<div class="empty">{% if q or status %}Ningún presupuesto con esos filtros.{% else %}Aún no hay presupuestos. Crea el primero desde una oportunidad o con el botón de arriba.{% endif %}</div>{% endif %}
+{% endblock %}
+{% block fab %}<a class="fab" href="{% url 'quote_new' %}" aria-label="Nuevo presupuesto">+</a>{% endblock %}

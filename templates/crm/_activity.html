@@ -1,0 +1,12 @@
+{% load crm %}
+<div class="tl k-{{ a.kind }}">
+  <span class="dot">{% icon a.kind %}</span>
+  <div>
+    <div class="head"><b>{{ a.get_kind_display }}{% if a.direction %} {{ a.get_direction_display|lower }}{% endif %}</b>{% if a.subject %}<span style="color:var(--fg)">{{ a.subject }}</span>{% endif %}
+      <span>{{ a.user|default:"Automático" }} · {{ a.occurred_at|due }}</span>
+      {% if show_opp and a.opportunity %}<a class="link" href="{% url 'opportunity' a.opportunity_id %}">{{ a.opportunity }}</a>{% endif %}
+      {% if show_company %}<a class="link" href="{% url 'company' a.company_id %}">{{ a.company }}</a>{% endif %}
+      {% if a.contact %}<span>con {{ a.contact }}</span>{% endif %}</div>
+    {% if a.body %}<div class="body">{{ a.body }}</div>{% endif %}
+  </div>
+</div>

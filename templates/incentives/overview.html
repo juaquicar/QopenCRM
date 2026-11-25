@@ -1,0 +1,62 @@
+{% extends "base.html" %}{% load crm %}
+{% block title %}Incentivos · QopenCRM{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><span class="eyebrow">{% if manager %}Gestión de incentivos{% else %}Lo que llevas ganado{% endif %}</span>
+    <h1 style="margin-top:8px">{% if manager and not person %}Incentivos del equipo{% elif own_view %}Mis incentivos{% else %}Incentivos de {{ person }}{% endif %}</h1>
+    <p class="lede">Según los programas de Ventas, Project Managers y Productividad. Las reglas completas están en el <a class="link" href="{% url 'articles' %}?q=incentivos">Banco de conocimiento</a>.</p></div>
+  {% if manager %}<div class="row">
+    <button class="btn ghost" data-modal="{% url 'modal_new' 'incentive_sales' %}{% if person %}?user={{ person.pk }}{% endif %}">{% icon "plus" %}Ventas</button>
+    <button class="btn ghost" data-modal="{% url 'modal_new' 'incentive_quota' %}{% if person %}?user={{ person.pk }}{% endif %}">{% icon "plus" %}cuota recurrente</button>
+    <button class="btn ghost" data-modal="{% url 'modal_new' 'incentive_pm' %}{% if person %}?user={{ person.pk }}{% endif %}">{% icon "plus" %}PM</button></div>{% endif %}
+</div>
+{% if manager %}<form class="filters" method="get"><select name="persona" aria-label="Persona" onchange="this.form.submit()"><option value="">Todo el equipo</option>{% for p in people %}<option value="{{ p.pk }}" {% if person and p.pk == person.pk %}selected{% endif %}>{{ p.name|default:p.email }}</option>{% endfor %}</select></form>{% endif %}
+
+<div class="card flush" style="margin-bottom:18px"><div class="grid cols-4" style="gap:0">
+  <div style="padding:16px"><span class="eyebrow">Incentivo previsto</span><div class="num incentive-figure">{{ totals.expected|eur }}</div><div class="muted small">Si se cobra todo lo aprobado</div></div>
+  <div style="padding:16px"><span class="eyebrow">Ya devengado</span><div class="num incentive-figure">{{ totals.earned|eur }}</div><div class="muted small">En proporción a lo cobrado</div></div>
+  <div style="padding:16px"><span class="eyebrow">Abonado</span><div class="num incentive-figure">{{ totals.paid|eur }}</div><div class="muted small">Pendiente de abonar: <b>{{ totals.due|eur }}</b></div></div>
+  <div style="padding:16px"><span class="eyebrow">Pendiente de validar</span><div class="num incentive-figure" {% if totals.n_proposed %}style="color:var(--warn)"{% endif %}>{{ totals.proposed|eur }}</div><div class="muted small">{{ totals.n_proposed }} propuesta{{ totals.n_proposed|pluralize }} sin decidir</div></div>
+</div></div>
+
+{% for label, items, code in programs %}
+<section class="card flush" style="margin-bottom:16px">
+  <div style="padding:16px 16px 6px"><h2>{{ label }}</h2>
+    <p class="muted small" style="margin-top:4px">{% if code == "sales_new" %}5 % del margen (facturación − costes directos) de un cliente nuevo captado y cerrado por ti. Se paga en proporción a lo que el cliente va pagando.{% elif code == "sales_quota" %}La media de las cuatro primeras cuotas recurrentes, cuando se cobra la cuarta. Si el cliente se da de baja antes, no hay incentivo.{% else %}5 % del margen si se cumplen satisfacción del cliente (8 o más) y rentabilidad; +1 % por plazos y +1 % por costes. Máximo 7 %. <b>Este programa figura como pendiente de aprobación por la Dirección:</b> hasta entonces, las cifras son orientativas.{% endif %}</p></div>
+  {% if items %}<div class="table-wrap"><table>
+    <thead><tr>{% if not person %}<th>Persona</th>{% endif %}<th>Concepto</th>
+      {% if code == "sales_quota" %}<th class="r hide-m">Cuotas</th><th class="r">Cobradas</th>{% else %}<th class="r hide-m">Margen</th><th class="r hide-m">%</th><th class="r">Cobrado</th>{% endif %}
+      <th class="r">Incentivo</th><th class="r">Devengado</th><th class="r hide-m">Abonado</th><th>Estado</th>{% if manager %}<th></th>{% endif %}</tr></thead>
+    <tbody>{% for i in items %}<tr {% if manager %}class="click" data-modal="{% if code == 'sales_new' %}{% url 'modal_edit' 'incentive_sales' i.pk %}{% elif code == 'sales_quota' %}{% url 'modal_edit' 'incentive_quota' i.pk %}{% else %}{% url 'modal_edit' 'incentive_pm' i.pk %}{% endif %}"{% endif %}>
+      {% if not person %}<td style="white-space:nowrap">{{ i.user }}</td>{% endif %}
+      <td style="min-width:230px"><b>{{ i.concept }}</b>
+        {% if code == "pm" %}<div class="row" style="gap:4px;margin-top:4px">{% for name, ok, needed in i.kpis %}<span class="chip {% if ok %}ok{% elif needed %}bad{% endif %}" title="{% if needed %}Imprescindible{% else %}Suma un 1 %{% endif %}">{% if ok %}✓{% else %}✗{% endif %} {{ name }}</span>{% endfor %}</div>{% endif %}
+        {% if i.notes %}<div class="muted small">{{ i.notes|truncatechars:110 }}</div>{% endif %}</td>
+      {% if code == "sales_quota" %}<td class="r num hide-m">{% for q in i.quotas %}{{ q|eur }}{% if not forloop.last %} · {% endif %}{% empty %}—{% endfor %}</td><td class="r num">{{ i.quotas_collected }} de 4</td>
+      {% else %}<td class="r num hide-m">{{ i.margin|eur }}<div class="muted small">{{ i.revenue|eur }} − {{ i.direct_costs|eur }}</div></td><td class="r num hide-m">{{ i.rate|num }} %</td><td class="r num">{{ i.collected_pct|num }} %</td>{% endif %}
+      <td class="r num"><b>{{ i.total|eur }}</b></td><td class="r num">{{ i.earned|eur }}</td><td class="r num hide-m">{{ i.paid|eur }}{% if i.due %}<div class="small" style="color:var(--warn)">faltan {{ i.due|eur }}</div>{% endif %}</td>
+      <td><span class="chip {% if i.status == 'approved' %}ok{% elif i.status == 'proposed' %}warn{% else %}bad{% endif %}">{{ i.get_status_display }}</span></td>
+      {% if manager %}<td class="r" style="white-space:nowrap">{% if i.status == "proposed" %}<form method="post" action="{% url 'incentive_decide' i.pk %}" class="row" style="gap:4px;justify-content:flex-end;flex-wrap:nowrap">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <button class="btn sm" name="status" value="approved">Aprobar</button><button class="btn ghost sm" name="status" value="rejected">No procede</button></form>{% endif %}</td>{% endif %}
+    </tr>{% endfor %}</tbody></table></div>
+  {% else %}<p class="muted small" style="padding:0 16px 16px">{% if own_view %}Aún no tienes incentivos en este programa.{% else %}Sin incentivos en este programa.{% endif %}{% if code != "pm" %} Al ganar una oportunidad de un cliente nuevo, se propone solo.{% endif %}</p>{% endif %}
+</section>
+{% endfor %}
+
+<section class="card" style="margin-bottom:16px">
+  <div class="spread"><h2>Productividad y crecimiento</h2>{% if manager %}<button class="btn ghost sm" data-modal="{% url 'modal_new' 'prodyear' %}">{% icon "plus" %}Ejercicio</button>{% endif %}</div>
+  <p class="muted small">Fondo anual del 10 % del beneficio, si crece al menos un 15 % sobre el año anterior. Se reparte en proporción a la nota de cada persona (media de compañeros y dirección), ajustada a los meses trabajados.</p>
+  {% for y in years %}<div class="incentive-year">
+    <div class="spread"><h3>{{ y.year.year }} {% if y.year.activated %}<span class="chip ok">Fondo activado</span>{% else %}<span class="chip">Fondo no activado</span>{% endif %}{% if manager and not y.year.published %} <span class="chip warn">Sin publicar</span>{% endif %}</h3>
+      {% if manager %}<div class="row"><button class="btn ghost sm" data-modal="{% url 'modal_new' 'prodscore' %}?year={{ y.year.pk }}">{% icon "plus" %}Nota</button><button class="btn ghost sm" data-modal="{% url 'modal_edit' 'prodyear' y.year.pk %}">{% icon "edit" %}Ejercicio</button></div>{% endif %}</div>
+    <dl class="kv num" style="max-width:460px;margin:8px 0">
+      {% if manager %}<dt>Beneficio</dt><dd>{{ y.year.profit|eur }} <span class="muted">(anterior: {{ y.year.previous_profit|eur }})</span></dd>{% endif %}
+      <dt>Crecimiento</dt><dd>{% if y.year.growth is not None %}{{ y.year.growth|num }} %{% else %}—{% endif %} <span class="muted">(mínimo {{ y.year.growth_threshold|num }} %)</span></dd>
+      <dt>Fondo a repartir</dt><dd><b>{{ y.year.fund|eur }}</b> <span class="muted">entre {{ y.n_people }} persona{{ y.n_people|pluralize }}</span></dd></dl>
+    {% if y.scores %}<div class="table-wrap"><table><thead><tr><th>Persona</th><th class="r">Compañeros</th><th class="r">Dirección</th><th class="r">Nota final</th><th class="r hide-m">Meses</th><th class="r">Te corresponde</th></tr></thead>
+      <tbody>{% for s in y.scores %}<tr {% if manager %}class="click" data-modal="{% url 'modal_edit' 'prodscore' s.pk %}"{% endif %}><td>{{ s.user }}{% if not s.eligible %} <span class="chip">No participa</span>{% endif %}</td>
+        <td class="r num">{{ s.peer_score|num }}</td><td class="r num">{{ s.management_score|num }}</td><td class="r num"><b>{{ s.final|num }}</b></td><td class="r num hide-m">{{ s.months }}</td><td class="r num"><b>{{ s.share|eur }}</b></td></tr>{% endfor %}</tbody></table></div>
+    {% else %}<p class="muted small">{% if person %}Sin nota registrada en este ejercicio.{% else %}Aún no hay notas.{% endif %}</p>{% endif %}
+  </div>{% empty %}<p class="muted small" style="margin-top:10px">{% if manager %}Aún no hay ningún ejercicio. Crea el del año con el beneficio y el del año anterior.{% else %}Todavía no se ha publicado ningún ejercicio.{% endif %}</p>{% endfor %}
+</section>
+{% endblock %}

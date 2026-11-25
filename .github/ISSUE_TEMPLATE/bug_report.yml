@@ -1,0 +1,53 @@
+name: Error
+description: Algo no funciona como debería
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gracias por avisar. No pegues datos reales de clientes ni claves.
+        Si es una vulnerabilidad, no sigas aquí: usa el aviso privado (pestaña Security).
+  - type: textarea
+    id: what
+    attributes:
+      label: Qué pasa
+      description: Qué esperabas y qué ocurre en su lugar.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Pasos para reproducirlo
+      placeholder: |
+        1. Entro como comercial
+        2. Abro una oportunidad
+        3. …
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Versión
+      description: Resultado de `git rev-parse --short HEAD`
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Parte afectada
+      options:
+        - Pipeline y oportunidades
+        - Empresas y contactos
+        - Presupuestos
+        - Suscripciones y horas
+        - IA y servidor MCP
+        - API y webhooks
+        - Captura de correo o Teams
+        - Instalación, copias o actualización
+        - Otra
+  - type: textarea
+    id: logs
+    attributes:
+      label: Registros
+      description: Lo relevante de `./qopencrm.sh logs web` (o `worker`), sin datos personales.
+      render: text

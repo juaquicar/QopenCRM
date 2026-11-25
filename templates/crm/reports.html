@@ -1,0 +1,49 @@
+{% extends "base.html" %}{% load crm %}
+{% block title %}Informes · QopenCRM{% endblock %}
+{% block content %}
+<div class="page-head"><div><span class="eyebrow">Solo superusuario</span><h1 style="margin-top:8px">Informes</h1></div></div>
+<div class="grid cols-4" style="margin-bottom:16px">
+  <div class="card stat"><span class="k">Pipeline abierto</span><span class="v">{{ pipeline_total.first_year|eur }}</span><span class="s">{{ pipeline_count }} oportunidades · valor primer año</span></div>
+  <div class="card stat"><span class="k">Tasa de conversión</span><span class="v">{% if conversion.rate is None %}—{% else %}{{ conversion.rate }} <small>%</small>{% endif %}</span><span class="s">{{ conversion.won }} ganadas · {{ conversion.lost }} perdidas</span></div>
+  <div class="card stat"><span class="k">Ciclo medio de venta</span><span class="v">{% if cycle_days is None %}—{% else %}{{ cycle_days|num }} <small>días</small>{% endif %}</span><span class="s">De alta a ganada</span></div>
+  <div class="card stat"><span class="k">MRR en cartera</span><span class="v">{{ recurring.mrr|eur }}</span><span class="s">{{ recurring.customers }} clientes · ARR {{ recurring.arr|eur }}</span></div>
+</div>
+<div class="grid cols-2">
+  <div class="stack">
+    <section class="card flush"><h2 style="padding:16px 16px 6px">Valor del pipeline por etapa</h2><div class="table-wrap"><table>
+      <thead><tr><th>Etapa</th><th class="r">Nº</th><th class="r">MRR</th><th class="r hide-m">Horas</th><th class="r hide-m">Único</th><th class="r">Primer año</th><th class="r">Ponderado</th></tr></thead>
+      <tbody>{% for r in pipeline %}<tr>
+        <td><b>{{ r.stage }}</b> <span class="muted small">{{ r.probability }} %</span><div class="bar" style="margin-top:5px"><i style="width:{{ r.bar }}%;background:{{ r.color }}"></i></div></td>
+        <td class="r num">{{ r.count }}</td><td class="r num">{{ r.mrr|eur }}</td><td class="r num hide-m">{{ r.services|eur }}</td><td class="r num hide-m">{{ r.one_off|eur }}</td>
+        <td class="r num"><b>{{ r.first_year|eur }}</b></td><td class="r num">{{ r.weighted|eur }}</td></tr>{% endfor %}
+        <tr><td><b>Total</b></td><td class="r num">{{ pipeline_count }}</td><td class="r num">{{ pipeline_total.mrr|eur }}</td><td class="r num hide-m">{{ pipeline_total.services|eur }}</td><td class="r num hide-m">{{ pipeline_total.one_off|eur }}</td><td class="r num"><b>{{ pipeline_total.first_year|eur }}</b></td><td class="r num"><b>{{ pipeline_total.weighted|eur }}</b></td></tr>
+      </tbody></table></div></section>
+    <section class="card flush"><h2 style="padding:16px 16px 6px">Previsión mensual</h2>
+      <p class="muted small" style="padding:0 16px 8px">Por mes de cierre estimado, ponderado por probabilidad. MRR, horas y pago único por separado.</p><div class="table-wrap"><table>
+      <thead><tr><th>Mes</th><th class="r">Nº</th><th class="r">MRR nuevo</th><th class="r hide-m">Horas</th><th class="r hide-m">Único</th><th class="r">Primer año</th></tr></thead>
+      <tbody>{% for m in forecast.months %}<tr>
+        <td><b>{{ m.month|month_label }}</b><div class="bar" style="margin-top:5px"><i style="width:{{ m.bar }}%;background:var(--accent)"></i></div></td>
+        <td class="r num">{{ m.count }}</td><td class="r num">{{ m.mrr|eur }}</td><td class="r num hide-m">{{ m.services|eur }}</td><td class="r num hide-m">{{ m.one_off|eur }}</td><td class="r num"><b>{{ m.weighted|eur }}</b></td></tr>{% endfor %}
+      </tbody></table></div>
+      {% if forecast.undated.count %}<p class="small" style="padding:10px 16px;color:var(--warn)">{{ forecast.undated.count }} oportunidad{{ forecast.undated.count|pluralize:"es" }} sin fecha de cierre ({{ forecast.undated.weighted|eur }} ponderado) no entra{{ forecast.undated.count|pluralize:"n" }} en la previsión.</p>{% endif %}
+    </section>
+  </div>
+  <div class="stack">
+    <section class="card"><h2>Conversión por comercial</h2>
+      {% for r in conversion.by_owner %}<div style="padding:7px 0"><div class="spread"><b>{{ r.owner }}</b><span class="num small">{{ r.rate }} % · {{ r.won }}/{{ r.won|add:r.lost }}</span></div><div class="bar" style="margin-top:5px"><i style="width:{{ r.rate }}%;background:var(--ok)"></i></div></div>
+      {% empty %}<p class="muted small">Aún no hay oportunidades cerradas.</p>{% endfor %}</section>
+    <section class="card"><h2>Motivos de pérdida</h2>
+      {% for r in loss_reasons %}<div style="padding:7px 0"><div class="spread"><b>{{ r.reason }}</b><span class="num small">{{ r.count }}</span></div><div class="bar" style="margin-top:5px"><i style="width:{{ r.bar }}%;background:var(--bad)"></i></div></div>
+      {% empty %}<p class="muted small">Sin pérdidas registradas.</p>{% endfor %}</section>
+    <section class="card"><h2>Recurrente · últimos 12 meses</h2>
+      <dl class="kv num">
+        <dt>Altas</dt><dd style="color:var(--ok)">+{{ recurring.moves.new|eur }}</dd>
+        <dt>Expansión</dt><dd style="color:var(--ok)">+{{ recurring.moves.upgrade|eur }}</dd>
+        <dt>Contracción</dt><dd style="color:var(--warn)">{{ recurring.moves.downgrade|eur }}</dd>
+        <dt>Bajas</dt><dd style="color:var(--bad)">{{ recurring.moves.cancel|eur }}</dd>
+        <dt>Horas vendidas</dt><dd>{{ recurring.hours_sold|num }} h</dd>
+        <dt>Horas consumidas</dt><dd>{{ recurring.hours_used|num }} h · quedan {{ recurring.hours_left|num }} h</dd>
+      </dl></section>
+  </div>
+</div>
+{% endblock %}

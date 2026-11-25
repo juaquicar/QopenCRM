@@ -1,0 +1,17 @@
+{% extends "base.html" %}{% load crm %}
+{% block title %}Empresas · QopenCRM{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><span class="eyebrow">Empresas y organismos</span><h1 style="margin-top:8px">Empresas</h1></div>
+  <div class="row">{% if user.edits_all %}<a class="btn ghost" href="{% url 'import' %}">Importar CSV</a>{% endif %}<button class="btn" data-modal="{% url 'modal_new' 'company' %}">{% icon "plus" %}Empresa</button></div>
+</div>
+<form class="filters" hx-get="{% url 'companies' %}" hx-target="#rows" hx-swap="outerHTML" hx-push-url="true" hx-trigger="change, input changed delay:300ms from:input[name=q]">
+  <div class="search"><input type="search" name="q" value="{{ filter.form.q.value|default:'' }}" placeholder="Buscar por nombre, CIF, dominio o persona…" aria-label="Buscar" autofocus></div>
+  {{ filter.form.kind }}{{ filter.form.owner }}{{ filter.form.event }}
+</form>
+<div class="card flush"><div class="table-wrap"><table>
+  <thead><tr><th>Empresa</th><th>Tipo</th><th class="hide-m">Población</th><th class="r">Abiertas</th><th class="r hide-m">Personas</th><th class="hide-m">Resp.</th></tr></thead>
+  {% include "crm/_company_rows.html" %}
+</table></div></div>
+{% endblock %}
+{% block fab %}<button class="fab" data-modal="{% url 'modal_new' 'company' %}" aria-label="Nueva empresa">+</button>{% endblock %}

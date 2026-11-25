@@ -1,0 +1,16 @@
+{% extends "base.html" %}{% load crm %}
+{% block title %}Nuevo presupuesto · QopenCRM{% endblock %}
+{% block content %}
+<div class="page-head"><div><a class="eyebrow" href="{% url 'quotes' %}">Presupuestos</a><h1 style="margin-top:8px">Nuevo presupuesto</h1>
+  <p class="lede">Un presupuesto va siempre ligado a una oportunidad. Parte de sus líneas y de la plantilla; después lo ajustas todo en el editor.</p></div></div>
+{% if opps %}
+<form class="card stack" method="get" style="max-width:640px">
+  <div class="field"><label for="opportunity">Oportunidad</label>
+    <select id="opportunity" name="opportunity" required><option value="">Elige una oportunidad…</option>{% for o in opps %}<option value="{{ o.pk }}">{{ o.company.name }} · {{ o.title }}</option>{% endfor %}</select>
+    <span class="help">Si ya tiene presupuesto, se abrirá para crear su siguiente versión.</span></div>
+  <div class="field"><label for="template">Plantilla</label>
+    <select id="template" name="template">{% for t in templates %}<option value="{{ t.pk }}">{{ t.name }}</option>{% endfor %}</select></div>
+  <div class="row"><button class="btn">Continuar</button><a class="btn ghost" href="{% url 'quotes' %}">Cancelar</a></div>
+</form>
+{% else %}<div class="empty">No tienes oportunidades abiertas sobre las que presupuestar. Crea una en el pipeline.</div>{% endif %}
+{% endblock %}

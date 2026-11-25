@@ -1,0 +1,16 @@
+.git
+.venv
+.env
+.env.*
+backups
+media
+branding
+staticfiles
+__pycache__
+*.pyc
+.codegraph
+.claude
+android/keystore
+android/.gradle
+android/build
+android/app

@@ -1,0 +1,13 @@
+{# Registro rápido: escribir y Enter. Sin esto el CRM es solo una agenda. #}
+<form class="composer" hx-post="{% url 'activity_add' %}" hx-target="#timeline" hx-swap="afterbegin">
+  <input type="hidden" name="company" value="{{ company.pk }}">
+  {% if opp %}<input type="hidden" name="opportunity" value="{{ opp.pk }}">{% endif %}
+  <div class="kinds" role="radiogroup" aria-label="Tipo">
+    <label><input type="radio" name="kind" value="note" checked>Nota</label>
+    <label><input type="radio" name="kind" value="call">Llamada</label>
+    <label><input type="radio" name="kind" value="email">Correo</label>
+    <label><input type="radio" name="kind" value="meeting">Reunión</label>
+  </div>
+  <textarea name="body" placeholder="¿Qué ha pasado? Escribe y pulsa Ctrl+Enter…" required aria-label="Detalle"></textarea>
+  <div class="bar2"><span class="muted small hide-m">Queda en el historial de la empresa</span><button class="btn sm">Registrar</button></div>
+</form>

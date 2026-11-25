@@ -1,0 +1,36 @@
+{% extends "base.html" %}{% load static crm %}
+{% block title %}Autorizar acceso · QopenCRM{% endblock %}
+{% block shell %}
+<div class="auth"><div class="gridbg"></div>
+  <div class="auth-card">
+    <img class="logo" src="{% static 'img/logo.png' %}" alt="QopenCRM">
+    <div><span class="eyebrow">Conectar un asistente</span><h1 style="margin-top:10px;font-size:clamp(24px,3vw,32px)">{{ client_name }} quiere acceder a <span style="color:var(--accent)">tu CRM</span></h1></div>
+    <div class="panel">
+      {% if allowed %}
+      <p>Has entrado como <b>{{ user }}</b> ({{ user.role_name }}). Si autorizas, esta aplicación podrá usar QopenCRM <b>en tu nombre y con tus permisos</b>:</p>
+      <ul class="manual-list" style="margin:0">
+        <li>Consultar lo que tú ves: empresas, contactos, oportunidades, tareas y presupuestos.</li>
+        <li>Crear y modificar lo que tú puedes modificar ({{ n_write }} de sus {{ n_tools }} herramientas cambian datos).</li>
+        <li>Enviar un presupuesto a un cliente solo si se lo pides.</li>
+      </ul>
+      <p class="muted small">Volverás a <span class="code">{{ redirect_host }}</span>. Puedes retirar el acceso cuando quieras en Ajustes → Asistente de IA.</p>
+      <form method="post" class="row" style="justify-content:flex-end">{% csrf_token %}
+        <input type="hidden" name="client_id" value="{{ client.client_id }}"><input type="hidden" name="redirect_uri" value="{{ redirect_uri }}">
+        <input type="hidden" name="state" value="{{ state }}"><input type="hidden" name="code_challenge" value="{{ code_challenge }}">
+        <input type="hidden" name="code_challenge_method" value="S256"><input type="hidden" name="response_type" value="code">
+        <input type="hidden" name="resource" value="{{ resource }}">
+        <button class="btn ghost" name="decision" value="deny">Cancelar</button>
+        <button class="btn" name="decision" value="allow">Autorizar</button>
+      </form>
+      {% else %}
+      <p>Has entrado como <b>{{ user }}</b> ({{ user.role_name }}), pero tu rol no tiene permitido conectar asistentes. Pídeselo a quien administra el CRM.</p>
+      <form method="post" class="row" style="justify-content:flex-end">{% csrf_token %}
+        <input type="hidden" name="client_id" value="{{ client.client_id }}"><input type="hidden" name="redirect_uri" value="{{ redirect_uri }}">
+        <input type="hidden" name="state" value="{{ state }}"><input type="hidden" name="code_challenge" value="{{ code_challenge }}">
+        <input type="hidden" name="code_challenge_method" value="S256"><input type="hidden" name="response_type" value="code">
+        <button class="btn ghost" name="decision" value="deny">Volver</button></form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

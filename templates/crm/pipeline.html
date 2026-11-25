@@ -1,0 +1,39 @@
+{% extends "base.html" %}{% load crm %}
+{% block title %}Pipeline · QopenCRM{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><span class="eyebrow">Oportunidades</span><h1 style="margin-top:8px">Pipeline</h1></div>
+  <div class="row">
+    {% if n_hold or hold %}<div class="seg" role="group" aria-label="Paradas por el cliente" title="Oportunidades a la espera del cliente: {{ n_hold }}">
+      <a href="{% qs hold='' %}" class="{% if not hold %}on{% endif %}">Con paradas</a><a href="{% qs hold='hide' %}" class="{% if hold == 'hide' %}on{% endif %}">Sin paradas</a><a href="{% qs hold='only' %}" class="{% if hold == 'only' %}on{% endif %}">Solo paradas · {{ n_hold }}</a></div>{% endif %}
+    <div class="seg"><a href="{% qs view='' %}" class="{% if view != 'list' %}on{% endif %}">Tablero</a><a href="{% qs view='list' %}" class="{% if view == 'list' %}on{% endif %}">Lista</a></div>
+    <button class="btn" data-modal="{% url 'modal_new' 'opportunity' %}">{% icon "plus" %}Oportunidad</button>
+  </div>
+</div>
+<form class="filters" hx-get="{% url 'pipeline' %}" hx-target="#board" hx-swap="outerHTML" hx-push-url="true" hx-trigger="change, input changed delay:300ms from:input[name=q]">
+  {% if view == "list" %}<input type="hidden" name="view" value="list">{% endif %}{% if hold %}<input type="hidden" name="hold" value="{{ hold }}">{% endif %}
+  <div class="search"><input type="search" name="q" value="{{ filter.form.q.value|default:'' }}" placeholder="Buscar oportunidad o empresa…" aria-label="Buscar"></div>
+  {{ filter.form.status }}
+  {{ filter.form.assignee }}
+  {{ filter.form.action }}
+  {{ filter.form.product }}
+  {{ filter.form.priority }}
+  <details style="display:contents" {% if 'family' in active_filters or 'close_from' in active_filters or 'close_to' in active_filters or 'owner' in active_filters or 'created_from' in active_filters or 'created_to' in active_filters or 'stage' in active_filters %}open{% endif %}>
+    <summary class="btn ghost sm" style="list-style:none">{% icon "filter" %}Más filtros</summary>
+    <div class="more-filters">
+      <div class="field"><label>Familia</label>{{ filter.form.family }}</div>
+      <div class="field"><label>Responsable</label>{{ filter.form.owner }}</div>
+      <div class="field"><label>Etapa</label>{{ filter.form.stage }}</div>
+      <div class="field"><label>Cierre desde</label><input type="date" name="close_from" value="{{ filter.form.close_from.value|default:'' }}"></div>
+      <div class="field"><label>Cierre hasta</label><input type="date" name="close_to" value="{{ filter.form.close_to.value|default:'' }}"></div>
+      <div class="field"><label>Creada desde</label><input type="date" name="created_from" value="{{ filter.form.created_from.value|default:'' }}"></div>
+      <div class="field"><label>Creada hasta</label><input type="date" name="created_to" value="{{ filter.form.created_to.value|default:'' }}"></div>
+    </div>
+  </details>
+  {% if active_filters %}<a class="link small" href="{% url 'pipeline' %}{% if view == 'list' %}?view=list{% endif %}">Quitar filtros</a>{% endif %}
+</form>
+{% if ai_enabled %}<form class="filters" method="post" action="{% url 'ai_search' %}" style="margin-top:-6px">{% csrf_token %}
+  <div class="search" style="max-width:520px"><input name="question" placeholder="✦ Pídelo con tus palabras: «lo de Plan Pro sin próxima acción de Ana»" aria-label="Buscar con IA"></div><button class="btn ghost sm">Buscar con IA</button></form>{% endif %}
+{% include "crm/_board.html" %}
+{% endblock %}
+{% block fab %}<button class="fab" data-modal="{% url 'modal_new' 'opportunity' %}" aria-label="Nueva oportunidad">+</button>{% endblock %}

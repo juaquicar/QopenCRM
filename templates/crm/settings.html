@@ -1,0 +1,101 @@
+{% extends "base.html" %}{% load crm %}
+{% block title %}Ajustes · QopenCRM{% endblock %}
+{% block content %}
+<div class="page-head"><div><span class="eyebrow">{{ user.role_name }}</span><h1 style="margin-top:8px">Ajustes</h1></div>
+  <div class="row only-m"><button class="btn ghost sm" data-theme-toggle>Cambiar tema</button><form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="btn ghost sm">Salir</button></form></div></div>
+<div class="row only-m" style="margin-bottom:16px"><a class="btn ghost sm" href="{% url 'quotes' %}">Presupuestos</a><a class="btn ghost sm" href="{% url 'events' %}">Ferias y eventos</a><a class="btn ghost sm" href="{% url 'contacts' %}">Contactos</a><a class="btn ghost sm" href="{% url 'products' %}">Productos</a><a class="btn ghost sm" href="{% url 'subscriptions' %}">Suscripciones</a>{% if user.can_see_reports %}<a class="btn ghost sm" href="{% url 'reports' %}">Informes</a>{% endif %}<a class="btn ghost sm" href="{% url 'incentives' %}">Incentivos</a><a class="btn ghost sm" href="{% url 'articles' %}">Banco de conocimiento</a><a class="btn ghost sm" href="{% url 'manual' %}">Manual</a></div>
+<div class="grid cols-2">
+  <div class="stack">
+    {% if user.is_superuser %}
+    <section class="card flush"><div class="spread" style="padding:16px 16px 6px"><h2>Usuarios</h2><button class="btn ghost sm" data-modal="{% url 'modal_new' 'user' %}">{% icon "plus" %}Usuario</button></div><div class="table-wrap"><table>
+      <thead><tr><th>Persona</th><th>Rol</th><th>Estado</th></tr></thead>
+      <tbody>{% for u in users %}<tr class="click" data-modal="{% url 'modal_edit' 'user' u.pk %}"><td><b>{{ u.name|default:"—" }}</b><div class="muted small">{{ u.email }}</div></td><td>{{ u.role_name }}</td><td><span class="chip {% if u.is_active %}ok{% else %}bad{% endif %}">{% if u.is_active %}Activo{% else %}Sin acceso{% endif %}</span></td></tr>{% endfor %}</tbody></table></div></section>
+    <section class="card flush"><h2 style="padding:16px 16px 6px">Roles y permisos</h2><div class="table-wrap"><table>
+      <thead><tr><th>Rol</th><th>Ve</th><th>Edita</th><th class="hide-m">Borra</th><th class="hide-m">Exporta</th><th class="hide-m">Catálogo</th><th class="hide-m">Etapas</th></tr></thead>
+      <tbody>{% for r in roles %}<tr class="click" data-modal="{% url 'modal_edit' 'role' r.pk %}"><td><b>{{ r.name }}</b></td><td>{{ r.get_view_scope_display }}</td><td>{{ r.get_edit_scope_display }}</td>
+        <td class="hide-m">{{ r.can_delete|yesno:"Sí,—" }}</td><td class="hide-m">{{ r.can_export|yesno:"Sí,—" }}</td><td class="hide-m">{{ r.can_manage_catalog|yesno:"Sí,—" }}</td><td class="hide-m">{{ r.can_manage_pipeline|yesno:"Sí,—" }}</td></tr>{% endfor %}</tbody></table></div>
+      <p class="muted small" style="padding:10px 16px">Los informes son siempre exclusivos del superusuario.</p></section>
+    {% endif %}
+    {% if user.can_manage_pipeline %}
+    <section class="card"><div class="spread"><h2>Etapas del pipeline</h2><button class="btn ghost sm" data-modal="{% url 'modal_new' 'stage' %}">{% icon "plus" %}Etapa</button></div>
+      {% for s in stages %}<div class="task" style="cursor:pointer" data-modal="{% url 'modal_edit' 'stage' s.pk %}"><span style="width:10px;height:10px;border-radius:50%;background:{{ s.color }};margin-top:6px"></span><div class="grow"><b>{{ s.name }}</b></div><span class="muted small">{{ s.probability }} %{% if s.is_won %} · ganada{% elif s.is_lost %} · perdida{% endif %}</span></div>{% endfor %}</section>
+    <section class="card"><div class="spread"><h2>Motivos de pérdida</h2><button class="btn ghost sm" data-modal="{% url 'modal_new' 'lossreason' %}">{% icon "plus" %}Motivo</button></div>
+      <div class="row">{% for r in loss_reasons %}<button class="chip" data-modal="{% url 'modal_edit' 'lossreason' r.pk %}">{{ r.name }}</button>{% endfor %}</div></section>
+    <section class="card"><div class="spread"><h2>Plantillas de presupuesto</h2><button class="btn ghost sm" data-modal="{% url 'modal_new' 'quotetemplate' %}">{% icon "plus" %}Plantilla</button></div>
+      {% for t in templates %}<div class="task" style="cursor:pointer" data-modal="{% url 'modal_edit' 'quotetemplate' t.pk %}"><div class="grow"><b>{{ t.name }}</b><div class="meta"><span>Validez {{ t.validity_days }} días · IVA {{ t.tax_rate|num }} %</span></div></div>{% if t.is_default %}<span class="chip accent">Por defecto</span>{% endif %}</div>{% endfor %}</section>
+    {% endif %}
+  </div>
+  <div class="stack">
+    <section class="card"><h2>Datos</h2>
+      <div class="row">{% if user.edits_all %}<a class="btn ghost" href="{% url 'import' %}">Importar CSV</a>{% endif %}{% if user.can_export %}<a class="btn ghost" href="{% url 'export' %}">Exportar todo (ZIP)</a>{% endif %}<a class="btn ghost" href="{% url 'api_docs' %}" target="_blank">Documentación de la API</a></div>
+      <p class="muted small" style="margin-top:10px">La exportación incluye un CSV por tabla: tus datos son tuyos.</p></section>
+    <section class="card" id="teams"><h2>Reuniones de Teams</h2>
+      <p class="muted small" style="margin-bottom:10px">Conecta una cuenta de Microsoft 365 para convocar reuniones de Teams desde una oportunidad. Inicias sesión en Microsoft tú mismo: el CRM no ve ni guarda tu contraseña.</p>
+      {% for a in ms_accounts %}<div class="task"><div class="grow"><b>{{ a.email }}</b>{% if a.shared %} <span class="chip cyan">Compartida con el equipo</span>{% endif %}
+        <div class="meta"><span>{% if a.refresh_token_enc %}conectada por{% elif a.shared %}buzón añadido por{% else %}buzón de{% endif %} {{ a.owner }}</span><span>{% if a.last_used_at %}usada {{ a.last_used_at|due }}{% else %}sin usar{% endif %}</span></div></div>
+        {% if user.is_superuser or a.owner_id == user.pk %}<form method="post" action="{% url 'microsoft_disconnect' a.pk %}">{% csrf_token %}<button class="btn danger sm">Desconectar</button></form>{% endif %}</div>
+      {% empty %}<p class="muted small">Ninguna cuenta conectada todavía.</p>{% endfor %}
+      {% if ms_config.ready %}<div class="row" style="margin-top:10px"><a class="btn sm" href="{% url 'microsoft_connect' %}">Conectar mi cuenta</a>
+        {% if user.is_superuser %}<a class="btn ghost sm" href="{% url 'microsoft_connect' %}?shared=1" title="Por ejemplo, la cuenta general de la empresa: podrá usarla todo el equipo">Conectar una cuenta compartida</a>{% endif %}</div>
+      {% elif not user.is_superuser %}<p class="muted small" style="margin-top:8px">Falta que el superusuario configure la aplicación de Microsoft 365.</p>{% endif %}
+      {% if user.is_superuser and ms_config.ready %}<form method="post" action="{% url 'microsoft_mailbox' %}" class="row" style="margin-top:12px;align-items:flex-end">{% csrf_token %}
+        <div class="field" style="flex:2 1 200px"><label for="ms-mail">Añadir un buzón (con los permisos de la aplicación)</label><input id="ms-mail" type="email" name="email" placeholder="info@example.onmicrosoft.com" required></div>
+        <div class="field" style="flex:1 1 160px"><label for="ms-owner">Quién puede usarlo</label><select id="ms-owner" name="owner"><option value="">Todo el equipo</option>{% for p in ms_people %}<option value="{{ p.pk }}">Solo {{ p.name|default:p.email }}</option>{% endfor %}</select></div>
+        <button class="btn sm">Añadir</button></form>
+      <p class="muted small" style="margin-top:6px">Sirve si la aplicación tiene permiso de aplicación «Calendars.ReadWrite»: no hace falta iniciar sesión en Microsoft.</p>{% endif %}
+      {% if user.is_superuser %}<details style="margin-top:12px" {% if not ms_config.ready %}open{% endif %}><summary class="link small">Aplicación de Microsoft 365 {% if ms_config.ready %}(configurada){% else %}(pendiente){% endif %}</summary>
+        <ol class="howto" style="margin:10px 0"><li>En <span class="code">entra.microsoft.com</span> → Aplicaciones → Registros de aplicaciones → <b>Nuevo registro</b>. Tipo de cuenta: solo este directorio.</li>
+          <li>URI de redirección (Web): <span class="code">{{ ms_redirect }}</span></li>
+          <li>Permisos de API → Microsoft Graph → <b>Delegados</b>: <span class="code">offline_access</span>, <span class="code">User.Read</span>, <span class="code">Calendars.ReadWrite</span>, <span class="code">OnlineMeetings.ReadWrite</span>. Concede el consentimiento de administrador.</li>
+          <li>Certificados y secretos → <b>Nuevo secreto de cliente</b>. Copia su <b>valor</b>.</li>
+          <li>Pega aquí los tres datos y guarda.</li></ol>
+        <form method="post" action="{% url 'microsoft_config' %}" class="stack" style="gap:8px">{% csrf_token %}
+          <div class="field"><label for="ms-tenant">Id. de directorio (inquilino)</label><input id="ms-tenant" name="tenant_id" value="{{ ms_config.tenant_id }}" required></div>
+          <div class="field"><label for="ms-client">Id. de aplicación (cliente)</label><input id="ms-client" name="client_id" value="{{ ms_config.client_id }}" required></div>
+          <div class="field"><label for="ms-secret">Secreto de cliente (valor)</label><input id="ms-secret" type="password" name="client_secret" autocomplete="off" placeholder="{% if ms_config.client_secret_enc %}Guardado: déjalo vacío para conservarlo{% else %}Pega el valor del secreto{% endif %}"></div>
+          <div><button class="btn sm">Guardar aplicación</button></div></form></details>{% endif %}
+    </section>
+    {% if apk_version %}<section class="card"><h2>App Android</h2>
+      <p class="muted small" style="margin-bottom:12px">La misma web a pantalla completa, con tu sesión. Necesita Chrome y Android 7 o posterior.</p>
+      <a class="btn" href="{% url 'apk' %}">Descargar la app · v{{ apk_version }}</a>
+      <p class="muted small" style="margin-top:10px">Al abrir el fichero, Android pedirá permiso para instalar desde el navegador. Más detalle en el <a class="link" href="{% url 'manual' %}#movil">manual</a>.</p>
+    </section>{% endif %}
+    {% if user.can_use_api %}
+    <section class="card"><h2>Mis claves de API</h2>
+      {% if new_key %}<div class="alert info" style="margin-bottom:10px"><div><b>Copia la clave ahora:</b> no volverá a mostrarse.<br><span class="code">{{ new_key }}</span></div></div>{% endif %}
+      {% for k in api_keys %}<div class="task"><div class="grow"><b>{{ k.name }}</b><div class="meta"><span class="code">{{ k.prefix }}…</span><span>{% if k.last_used_at %}Usada {{ k.last_used_at|due }}{% else %}Sin usar{% endif %}</span></div></div>
+        <form method="post" action="{% url 'api_key_revoke' k.pk %}">{% csrf_token %}<button class="btn danger sm">Revocar</button></form></div>{% endfor %}
+      <form method="post" action="{% url 'api_key_create' %}" class="row" style="margin-top:10px">{% csrf_token %}<input name="name" placeholder="Para qué es (ERP, facturación…)" style="flex:1;width:auto" required><button class="btn sm">Crear clave</button></form>
+      <p class="muted small" style="margin-top:8px">Cabecera <span class="code">Authorization: Bearer qcrm_…</span> · actúa con tus permisos.</p></section>
+    <section class="card" id="mcp"><h2>Asistente de IA (MCP)</h2>
+      <p class="muted small" style="margin-bottom:10px">Conecta tu asistente (Claude u otro compatible con MCP) y pídele las cosas con tus palabras: «¿qué tengo para hoy?», «crea un lead de Fibranet con Plan Pro», «anota que he llamado a Marta». Trabaja con tus permisos de <b>{{ user.role_name }}</b>: {{ mcp_tools|length }} herramientas.</p>
+      <dl class="kv"><dt>Dirección</dt><dd><span class="code">{{ mcp_url }}</span></dd></dl>
+      <details style="margin-top:10px" open><summary class="link small">Conectarlo desde Claude (web, escritorio o móvil)</summary>
+        <ol class="howto" style="margin-top:8px"><li>En Claude: Ajustes → Conectores → <b>Añadir conector personalizado</b>.</li>
+          <li>Pega la dirección de arriba. No hace falta ninguna clave.</li>
+          <li>Se abre el CRM: entra con tu correo y pulsa <b>Autorizar</b>.</li></ol></details>
+      <details style="margin-top:6px"><summary class="link small">Conectarlo con clave (Claude Code y otros)</summary>
+        <p class="muted small" style="margin-top:8px">Crea una clave en «Mis claves de API». Claude Code:</p>
+        <pre class="code-block">claude mcp add --transport http qopencrm {{ mcp_url }} --header "Authorization: Bearer TU_CLAVE"</pre>
+        <p class="muted small">Otros clientes (fichero de configuración MCP):</p>
+        <pre class="code-block">{"mcpServers": {"qopencrm": {"type": "http", "url": "{{ mcp_url }}",
+  "headers": {"Authorization": "Bearer TU_CLAVE"}}}}</pre></details>
+      {% if connected_apps %}<h3 style="margin-top:14px;font-size:15px">Aplicaciones con acceso a tu cuenta</h3>
+      {% for app in connected_apps %}<div class="task"><div class="grow"><b>{{ app.client }}</b><div class="meta"><span>desde {{ app.since|short_date }}</span><span>{% if app.last_used_at %}usada {{ app.last_used_at|due }}{% else %}sin usar{% endif %}</span></div></div>
+        <form method="post" action="{% url 'oauth_revoke' app.client.pk %}">{% csrf_token %}<button class="btn danger sm">Retirar acceso</button></form></div>{% endfor %}{% endif %}
+      <details style="margin-top:6px"><summary class="link small">Qué puede hacer con tu rol</summary>
+        <ul class="mcp-tools">{% for t in mcp_tools %}<li><span class="code">{{ t.name }}</span> {% if t.write %}<span class="chip {% if t.destructive %}warn{% else %}cyan{% endif %}">{% if t.destructive %}confirma antes{% else %}modifica{% endif %}</span>{% endif %}<div class="muted small">{{ t.description }}</div></li>{% endfor %}</ul></details>
+    </section>
+    {% endif %}
+    {% if user.is_superuser %}
+    <section class="card"><div class="spread"><h2>Webhooks</h2><button class="btn ghost sm" data-modal="{% url 'modal_new' 'webhook' %}">{% icon "plus" %}Webhook</button></div>
+      {% for w in webhooks %}<div class="task" style="cursor:pointer" data-modal="{% url 'modal_edit' 'webhook' w.pk %}"><div class="grow"><b>{{ w.name }}</b><div class="meta"><span class="truncate">{{ w.url }}</span></div><div class="meta">Secreto: <span class="code">{{ w.secret }}</span></div></div><span class="chip {% if w.is_active %}ok{% endif %}">{{ w.is_active|yesno:"Activo,Parado" }}</span></div>
+      {% empty %}<p class="muted small">Avisa a facturación o al ERP cuando se gana una oportunidad o cambia una suscripción.</p>{% endfor %}
+      {% if deliveries %}<details style="margin-top:8px"><summary class="link small">Últimas entregas</summary>{% for d in deliveries %}<div class="meta small" style="display:flex;gap:8px;padding:3px 0"><span class="chip {% if d.delivered_at %}ok{% else %}bad{% endif %}">{{ d.status_code|default:"err" }}</span><span>{{ d.event }}</span><span class="muted">{{ d.created_at|due }}</span></div>{% endfor %}</details>{% endif %}</section>
+    <section class="card flush"><h2 style="padding:16px 16px 6px">Registro de accesos (RGPD)</h2><div class="table-wrap" style="max-height:420px;overflow-y:auto"><table>
+      <thead><tr><th>Cuándo</th><th>Quién</th><th>Qué</th><th class="hide-m">Canal</th></tr></thead>
+      <tbody>{% for l in access_logs %}<tr><td class="small">{{ l.created_at|date:"j M H:i" }}</td><td class="small">{{ l.user|default:"—" }}</td><td class="small"><b>{{ l.get_action_display }}</b> {{ l.object_type }} {{ l.object_repr|truncatechars:40 }}</td><td class="small hide-m">{{ l.channel }}</td></tr>{% endfor %}</tbody></table></div></section>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

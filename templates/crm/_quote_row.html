@@ -1,0 +1,11 @@
+{% load crm %}<tr data-quote-row>
+  <td><input type="hidden" name="line_code" value="{{ l.code|default:'' }}"><input type="hidden" name="line_unit" value="{{ l.unit|default:'' }}">
+    <textarea name="line_description" rows="2" aria-label="Descripción" placeholder="Concepto&#10;- detalle">{{ l.description|default:'' }}</textarea></td>
+  <td><select name="line_billing_model" aria-label="Cobro">{% for v, label in billing_models %}<option value="{{ v }}" {% if l.billing_model == v %}selected{% elif not l and v == "one_off" %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+    <select name="line_period" aria-label="Periodo" data-quote-period><option value="monthly" {% if l.period != "annual" %}selected{% endif %}>Mensual</option><option value="annual" {% if l.period == "annual" %}selected{% endif %}>Anual</option></select></td>
+  <td><input class="r" name="line_quantity" value="{{ l.quantity|default:'1' }}" inputmode="decimal" aria-label="Cantidad"></td>
+  <td><input class="r" name="line_unit_price" value="{{ l.unit_price|default_if_none:'' }}" inputmode="decimal" aria-label="Precio por unidad" placeholder="A consultar"></td>
+  <td><input class="r" name="line_discount" value="{% if l %}{{ l.discount|num }}{% else %}0{% endif %}" inputmode="decimal" aria-label="Descuento %"></td>
+  <td class="r num" data-quote-amount>—</td>
+  <td class="r"><button type="button" class="iconbtn" data-quote-remove title="Quitar línea" aria-label="Quitar línea">{% icon "x" %}</button></td>
+</tr>

@@ -1,0 +1,12 @@
+{% load crm %}
+<tbody id="rows">
+{% for c in page %}<tr>
+  <td><b>{{ c.full_name }}</b>{% if c.position %}<div class="muted small">{{ c.position }}</div>{% endif %}</td>
+  <td>{% if c.company %}<a class="link" href="{% url 'company' c.company_id %}">{{ c.company }}</a>{% else %}—{% endif %}</td>
+  <td class="hide-m">{% if c.email %}<a class="link" href="mailto:{{ c.email }}">{{ c.email }}</a>{% else %}—{% endif %}</td>
+  <td class="hide-m">{% if c.mobile or c.phone %}<a class="link" href="tel:{{ c.mobile|default:c.phone }}">{{ c.mobile|default:c.phone }}</a>{% else %}—{% endif %}</td>
+  <td>{% if c.erased_at %}<span class="chip bad">Suprimido</span>{% else %}<span class="chip {% if c.legal_basis == 'unknown' %}warn{% endif %}">{{ c.get_legal_basis_display }}</span>{% endif %}</td>
+  <td class="r">{% if not c.erased_at %}<button class="iconbtn" style="width:28px;height:28px;border:0;display:inline-grid" data-modal="{% url 'modal_edit' 'contact' c.pk %}" aria-label="Editar">{% icon "edit" %}</button>{% endif %}</td>
+</tr>{% empty %}<tr><td colspan="6"><div class="empty">Ningún contacto con estos filtros.</div></td></tr>{% endfor %}
+{% if page.has_next %}<tr hx-get="{% qs page=page.next_page_number %}" hx-trigger="revealed" hx-swap="outerHTML" hx-select="#rows > tr"><td colspan="6" class="muted small">Cargando más…</td></tr>{% endif %}
+</tbody>

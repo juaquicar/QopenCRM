@@ -1,0 +1,26 @@
+{% extends "base.html" %}{% load crm %}
+{% block title %}Ferias y eventos · QopenCRM{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><span class="eyebrow">Origen de los contactos</span><h1 style="margin-top:8px">Ferias y eventos</h1>
+    <p class="lede">Dónde conocimos a cada empresa, y qué ha salido de cada feria. Se asigna en la ficha de la empresa, campo «Conocida en».</p></div>
+  {% if user.can_manage_events %}<button class="btn" data-modal="{% url 'modal_new' 'event' %}">{% icon "plus" %}Feria o evento</button>{% endif %}
+</div>
+{% if any %}
+{% for label, events in groups %}{% if events %}
+<h2 style="margin:18px 0 10px">{{ label }} <span class="muted" style="font-size:.7em">{{ events|length }}</span></h2>
+<div class="card flush"><div class="table-wrap"><table>
+  <thead><tr><th>Fechas</th><th>Nombre</th><th>Tipo</th><th class="hide-m">Lugar</th><th class="r">Empresas</th><th class="r">Abiertas</th><th class="r hide-m">Ganadas</th></tr></thead>
+  <tbody>{% for e in events %}<tr class="click" data-href="{% url 'event' e.pk %}">
+    <td class="num" style="white-space:nowrap">{% if e.starts_on %}{{ e.starts_on|date:"d/m/Y" }}{% if e.ends_on and e.ends_on != e.starts_on %}<span class="muted"> – {{ e.ends_on|date:"d/m" }}</span>{% endif %}{% else %}—{% endif %}</td>
+    <td><b>{{ e.name }}</b></td>
+    <td><span class="chip {% if e.kind == 'fair' %}accent{% elif e.kind == 'event' %}cyan{% endif %}">{{ e.get_kind_display }}</span></td>
+    <td class="hide-m">{{ e.place|default:"—" }}</td>
+    <td class="r num"><b>{{ e.n_companies }}</b></td><td class="r num">{{ e.n_open }}</td><td class="r num hide-m">{{ e.n_won }}</td>
+  </tr>{% endfor %}</tbody>
+</table></div></div>
+{% endif %}{% endfor %}
+{% if not user.sees_all %}<p class="muted small" style="margin-top:10px">Los recuentos son de las empresas y oportunidades que tú ves.</p>{% endif %}
+{% else %}<div class="empty">Aún no hay ferias ni eventos.{% if user.can_manage_events %} Da de alta el primero y asígnalo a las empresas que conociste allí.{% endif %}</div>{% endif %}
+{% endblock %}
+{% block fab %}{% if user.can_manage_events %}<button class="fab" data-modal="{% url 'modal_new' 'event' %}" aria-label="Nueva feria o evento">+</button>{% endif %}{% endblock %}

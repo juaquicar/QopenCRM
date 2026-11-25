@@ -1,0 +1,86 @@
+{% extends "base.html" %}{% load crm %}
+{% block title %}{{ opp.title }} · QopenCRM{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div class="grow"><a class="eyebrow" href="{% url 'company' company.pk %}">{{ company.name }}</a>
+    <h1 style="margin-top:8px">{{ opp.title }}</h1>
+    <div class="row" style="margin-top:10px">
+      {% if opp.priority == 3 %}<span class="chip accent"><i></i>Prioridad alta</span>{% elif opp.priority == 1 %}<span class="chip">Prioridad baja</span>{% endif %}
+      {% if opp.owner %}<span class="chip"><span class="avatar" style="width:18px;height:18px;font-size:8.5px">{{ opp.owner.initials }}</span>{{ opp.owner }}</span>{% endif %}
+      {% for u in opp.assignees.all %}<span class="chip">+ {{ u }}</span>{% endfor %}
+      {% if opp.expected_close %}<span class="chip">Cierre {{ opp.expected_close|short_date }}</span>{% endif %}
+      <span class="chip">{{ opp.probability }} % prob.</span>
+      {% if opp.source %}<span class="chip">Origen: {{ opp.source }}</span>{% endif %}
+    </div></div>
+  {% if can_edit %}<div class="row">{% if opp.is_open %}<button class="btn ghost" data-modal="{% url 'teams_meeting' opp.pk %}" title="Convocar una reunión de Teams con el contacto">{% icon "meeting" %}Teams</button>{% endif %}{% if opp.is_open and not opp.on_hold %}<button class="btn ghost" data-modal="{% url 'opportunity_hold' opp.pk %}" title="A la espera del cliente, con fecha de revisión">Parar</button>{% endif %}
+    <button class="btn ghost" data-modal="{% url 'modal_edit' 'opportunity' opp.pk %}">{% icon "edit" %}Editar</button></div>{% endif %}
+</div>
+{% if opp.on_hold %}<div class="alert {% if not opp.hold_overdue %}info{% endif %}" style="margin-bottom:14px"><div><b>Parada por el cliente</b> desde el {{ opp.on_hold_since|date:"d/m/Y" }}. {% if opp.hold_overdue %}<b>Tocaba revisarla el {{ opp.on_hold_until|date:"d/m/Y" }}.</b>{% else %}Revisar el <b>{{ opp.on_hold_until|date:"d/m/Y" }}</b>.{% endif %}
+  {% if opp.on_hold_reason %}<div class="muted">{{ opp.on_hold_reason }}</div>{% endif %}{% if opp.hold_count >= 3 %}<div class="muted">Se ha parado {{ opp.hold_count }} veces: valora darla por perdida.</div>{% endif %}</div>
+  {% if can_edit %}<div class="row"><form method="post" action="{% url 'opportunity_resume' opp.pk %}">{% csrf_token %}<button class="btn sm">Reanudar</button></form><button class="btn ghost sm" data-modal="{% url 'opportunity_hold' opp.pk %}">Cambiar revisión</button></div>{% endif %}</div>{% endif %}
+
+<div class="steps" role="group" aria-label="Etapa">
+  {% for s in stages %}<button style="--c:{{ s.color }}" class="{% if s == opp.stage %}on{% elif s.order < opp.stage.order and s.is_open %}done{% endif %}" {% if can_edit and s != opp.stage %}hx-post="{% url 'opportunity_move' opp.pk %}" hx-vals='{"stage": "{{ s.pk }}"}' hx-swap="none" {% if s.is_won %}hx-confirm="¿Marcar como ganada? Se crearán las suscripciones y bolsas de horas de sus líneas."{% endif %}{% else %}disabled{% endif %}>{{ s.name }}</button>{% endfor %}
+</div>
+{% if opp.stage.is_lost %}<div class="alert" style="margin-top:12px"><b>Perdida</b>{% if opp.loss_reason %}<span>Motivo: {{ opp.loss_reason }}</span>{% endif %}{% if opp.loss_notes %}<span class="muted">{{ opp.loss_notes }}</span>{% endif %}</div>{% endif %}
+
+<div class="split3" style="margin-top:16px">
+  <div class="stat"><span class="k">Recurrente (MRR)</span><span class="v">{{ opp.amount_mrr|eur }} <small>/mes</small></span><span class="s">{{ opp.amount_mrr|eur }} × 12 al año</span></div>
+  <div class="stat"><span class="k">Servicios por horas</span><span class="v">{{ opp.amount_services|eur }}</span><span class="s">Auditoría, consultoría, formación</span></div>
+  <div class="stat"><span class="k">Pago único</span><span class="v">{{ opp.amount_one_off|eur }}</span><span class="s">Primer año: {{ opp.first_year_value|eur }}</span></div>
+</div>
+
+<div class="grid cols-2" style="margin-top:16px">
+  <div class="stack">
+    <section class="card">
+      <div class="spread"><h2>Líneas</h2>{% if can_edit %}<button class="btn ghost sm" data-modal="{% url 'modal_new' 'line' %}?opportunity={{ opp.pk }}">{% icon "plus" %}Añadir producto</button>{% endif %}</div>
+      {% if lines %}<div class="table-wrap"><table>
+        <thead><tr><th>Concepto</th><th>Cobro</th><th class="r">Cant.</th><th class="r hide-m">Precio</th><th class="r">Importe</th></tr></thead>
+        <tbody>{% for l in lines %}<tr class="click" {% if can_edit %}data-modal="{% url 'modal_edit' 'line' l.pk %}"{% endif %}>
+          <td><b>{{ l.description }}</b>{% if l.discount %}<div class="muted small">Dto. {{ l.discount|num }} %</div>{% endif %}</td>
+          <td><span class="chip {% if l.billing_model == 'monthly' %}cyan{% elif l.billing_model == 'hourly' %}warn{% endif %}">{% if l.billing_model == 'monthly' %}{{ l.get_period_display }}{% else %}{{ l.get_billing_model_display }}{% endif %}</span></td>
+          <td class="r num">{{ l.quantity|num }} <span class="muted small">{{ l.unit }}</span></td>
+          <td class="r num hide-m">{% if l.unit_price is None %}<span class="muted">A consultar</span>{% else %}{{ l.unit_price|eur }}{% endif %}</td>
+          <td class="r num"><b>{% if l.unit_price is None %}—{% else %}{{ l.total|eur }}{% endif %}</b></td>
+        </tr>{% endfor %}</tbody></table></div>
+      {% else %}<div class="empty">Sin productos todavía. Añade planes, usuarios extra u horas: el importe se separa solo en MRR, servicios y pago único.</div>{% endif %}
+    </section>
+
+    <section>
+      {% include "crm/_composer.html" %}
+      <div class="timeline" id="timeline">{% for a in timeline %}{% include "crm/_activity.html" %}{% empty %}<div class="empty timeline-empty">Sin actividad. Registra la primera nota o llamada.</div>{% endfor %}</div>
+    </section>
+  </div>
+
+  <div class="stack">
+    <section class="card" {% if opp.stage.is_open and not opp.next_action_at %}style="border-color:color-mix(in srgb,var(--warn) 55%,transparent)"{% endif %}>
+      <div class="spread"><h2>Próxima acción</h2>{% if opp.stage.is_open and not opp.next_action_at %}<span class="chip warn">Falta</span>{% endif %}</div>
+      {% for t in tasks %}{% include "crm/_task.html" %}{% endfor %}
+      {% if opp.stage.is_open %}<div style="margin-top:12px">{% include "crm/_quick_next.html" %}</div>{% endif %}
+    </section>
+
+    <section class="card">
+      <h2>Presupuestos</h2>
+      {% for q in quotes %}<div class="task"><div class="grow"><a class="link" href="{% url 'quote' q.pk %}"><b>{{ q.number }} · v{{ q.version }}</b></a><div class="meta"><span>{{ q.issued_on|short_date }}</span><span>{{ q.base|eur }}</span>{% if q.sent_at %}<span>enviado</span>{% endif %}</div></div>
+        <form method="post" action="{% url 'quote_status' q.pk %}">{% csrf_token %}<select name="status" onchange="this.form.submit()" aria-label="Estado" style="min-height:30px;padding:2px 8px;font-size:12px;width:auto;border-radius:99px" {% if not can_edit %}disabled{% endif %}>{% for v, l in q.Status.choices %}<option value="{{ v }}" {% if v == q.status %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></form>
+        <a class="iconbtn" href="{% url 'quote_pdf' q.pk %}" target="_blank" title="Abrir PDF" aria-label="Abrir PDF">{% icon "pdf" %}</a></div>
+      {% empty %}<p class="muted small">Aún no hay presupuestos. Se generan desde las líneas; cada cambio crea una versión nueva.</p>{% endfor %}
+      {% if can_edit %}<form method="post" action="{% url 'quote_create' opp.pk %}" class="row" style="margin-top:12px">{% csrf_token %}
+        <select name="template" aria-label="Plantilla" style="flex:1;width:auto">{% for t in templates %}<option value="{{ t.pk }}">{{ t.name }}</option>{% endfor %}</select>
+        <button class="btn sm">{% if quotes %}Nueva versión{% else %}Generar PDF{% endif %}</button></form>
+      <p class="muted small" style="margin-top:8px">{% if quotes %}<a class="link" href="{% url 'quote_edit' quotes.0.pk %}">Editar líneas, precios y textos</a>{% else %}<a class="link" href="{% url 'quote_new' %}?opportunity={{ opp.pk }}">Crear ajustando líneas, precios y textos</a>{% endif %}</p>{% endif %}
+    </section>
+
+    <section class="card">
+      <h2>Datos</h2>
+      <dl class="kv">
+        <dt>Empresa</dt><dd><a class="link" href="{% url 'company' company.pk %}">{{ company.name }}</a></dd>
+        {% if opp.contact %}<dt>Contacto</dt><dd>{{ opp.contact }}{% if opp.contact.email %}<br><a class="link" href="mailto:{{ opp.contact.email }}">{{ opp.contact.email }}</a>{% endif %}{% if opp.contact.mobile or opp.contact.phone %}<br><a class="link" href="tel:{{ opp.contact.mobile|default:opp.contact.phone }}">{{ opp.contact.mobile|default:opp.contact.phone }}</a>{% endif %}</dd>{% endif %}
+        <dt>Creada</dt><dd>{{ opp.created_at|short_date }}</dd>
+        {% if opp.closed_at %}<dt>Cerrada</dt><dd>{{ opp.closed_at|short_date }}</dd>{% endif %}
+        {% if opp.description %}<dt>Descripción</dt><dd style="white-space:pre-wrap">{{ opp.description }}</dd>{% endif %}
+      </dl>
+    </section>
+  </div>
+</div>
+{% endblock %}

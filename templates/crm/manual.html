@@ -1,0 +1,391 @@
+{% extends "base.html" %}{% load crm %}
+{% block title %}Manual · QopenCRM{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><span class="eyebrow">Manual de usuario</span><h1 style="margin-top:8px">{{ p.name }}</h1>
+    <p class="lede">{% if is_own %}Lo que puedes hacer en QopenCRM con tu perfil, paso a paso.{% else %}Así ve y usa QopenCRM una persona con el perfil «{{ p.name }}».{% endif %} El texto se adapta a los permisos reales del rol.</p></div>
+  {% if tabs %}<div class="seg manual-roles" role="tablist" aria-label="Perfil">{% for t in tabs %}<a href="{% url 'manual_role' t.code %}" class="{% if t.code == p.code %}on{% endif %}">{{ t.name }}</a>{% endfor %}</div>{% endif %}
+</div>
+
+<div class="manual">
+<nav class="manual-toc card" aria-label="Contenido">
+  <b>Contenido</b>
+  <a href="#perfil">Tu perfil</a>
+  <a href="#rutina">Tu rutina</a>
+  <a href="#entrar">Entrar</a>
+  <a href="#hoy">Hoy</a>
+  <a href="#pipeline">Pipeline</a>
+  <a href="#oportunidad">Oportunidad</a>
+  <a href="#presupuestos">Presupuestos</a>
+  <a href="#empresas">Empresas y contactos</a>
+  <a href="#actividad">Actividad y correo</a>
+  <a href="#tareas">Tareas</a>
+  <a href="#productos">Productos</a>
+  <a href="#suscripciones">Suscripciones y horas</a>
+  {% if p.can_see_reports %}<a href="#informes">Informes</a>{% endif %}
+  <a href="#ajustes">Ajustes</a>
+  <a href="#incentivos">Incentivos</a>
+  <a href="#conocimiento">Banco de conocimiento</a>
+  {% if p.can_use_api %}<a href="#asistente">Asistente de IA</a>{% endif %}
+  <a href="#movil">En el móvil</a>
+  <a href="#dudas">Dudas frecuentes</a>
+</nav>
+
+<div class="manual-body stack">
+
+<section class="card" id="perfil">
+  <h2>Tu perfil: {{ p.name }}</h2>
+  <p>{% if p.is_superuser %}Eres quien administra el CRM: lo ves todo, lo editas todo y eres la única persona con acceso a los informes, a los usuarios y a los permisos de cada rol.
+  {% elif p.sees_all %}Ves las empresas, oportunidades y tareas de <b>todo el equipo</b>, las cree quien las cree{% if p.edits_all %}, y puedes editarlas{% else %}, pero solo editas las que tienes asignadas{% endif %}.
+  {% else %}Ves y editas <b>lo tuyo</b>: las oportunidades de las que eres responsable o en las que estás asignado, y todo lo que cuelga de ellas (empresa, contactos, actividad, presupuestos y tareas). También ves las empresas que aún no tienen responsable.{% endif %}</p>
+  <div class="table-wrap"><table class="manual-perms">
+    <thead><tr><th>Qué</th><th>Tu perfil</th></tr></thead>
+    <tbody>
+      <tr><td>Ver</td><td>{% if p.sees_all %}<span class="chip ok">Todo el equipo</span>{% else %}<span class="chip warn">Solo lo tuyo</span>{% endif %}</td></tr>
+      <tr><td>Editar</td><td>{% if p.edits_all %}<span class="chip ok">Todo</span>{% else %}<span class="chip warn">Solo lo tuyo</span>{% endif %}</td></tr>
+      <tr><td>Borrar registros y suprimir datos personales (RGPD)</td><td>{% if p.can_delete %}<span class="chip ok">Sí</span>{% else %}<span class="chip">No</span>{% endif %}</td></tr>
+      <tr><td>Importar empresas y contactos desde CSV</td><td>{% if p.edits_all %}<span class="chip ok">Sí</span>{% else %}<span class="chip">No</span>{% endif %}</td></tr>
+      <tr><td>Exportar todos los datos</td><td>{% if p.can_export %}<span class="chip ok">Sí</span>{% else %}<span class="chip">No</span>{% endif %}</td></tr>
+      <tr><td>Gestionar el catálogo de productos</td><td>{% if p.can_manage_catalog %}<span class="chip ok">Sí</span>{% else %}<span class="chip">Solo consulta</span>{% endif %}</td></tr>
+      <tr><td>Configurar etapas, motivos de pérdida y plantillas de presupuesto</td><td>{% if p.can_manage_pipeline %}<span class="chip ok">Sí</span>{% else %}<span class="chip">No</span>{% endif %}</td></tr>
+      <tr><td>Dar de alta y modificar ferias y eventos</td><td>{% if p.can_manage_events %}<span class="chip ok">Sí</span>{% else %}<span class="chip">Solo consulta</span>{% endif %}</td></tr>
+      <tr><td>Gestionar incentivos del equipo</td><td>{% if p.can_manage_incentives %}<span class="chip ok">Sí</span>{% else %}<span class="chip">Solo ves los tuyos</span>{% endif %}</td></tr>
+      <tr><td>Editar el banco de conocimiento</td><td>{% if p.can_manage_knowledge %}<span class="chip ok">Sí</span>{% else %}<span class="chip">Solo lectura</span>{% endif %}</td></tr>
+      <tr><td>Claves de API</td><td>{% if p.can_use_api %}<span class="chip ok">Sí</span>{% else %}<span class="chip">No</span>{% endif %}</td></tr>
+      <tr><td>Informes</td><td>{% if p.can_see_reports %}<span class="chip ok">Sí</span>{% else %}<span class="chip">No · solo superusuario</span>{% endif %}</td></tr>
+      <tr><td>Usuarios, roles, webhooks y registro de accesos</td><td>{% if p.is_superuser %}<span class="chip ok">Sí</span>{% else %}<span class="chip">No · solo superusuario</span>{% endif %}</td></tr>
+    </tbody></table></div>
+  <h3>Quién ve una oportunidad</h3>
+  <ul class="manual-list">
+    <li>Su <b>responsable</b> y las personas que tenga <b>asignadas</b>, siempre.</li>
+    <li>Los perfiles que ven todo el equipo{% if wide_roles %} (hoy: {{ wide_roles|join:", " }}){% endif %} y el superusuario, la cree quien la cree.</li>
+    <li>Un perfil que solo ve lo suyo{% if narrow_roles %} (hoy: {{ narrow_roles|join:", " }}){% endif %} <b>no</b> ve las oportunidades de otra persona, salvo que le asignen a ellas.</li>
+  </ul>
+  {% if not p.sees_all %}<p class="manual-tip">Si necesitas que un compañero vea una oportunidad tuya, edítala y márcalo en «También asignada a».</p>{% endif %}
+</section>
+
+<section class="card" id="rutina">
+  <h2>Tu rutina</h2>
+  {% if p.is_superuser %}
+  <ol class="howto">
+    <li><b>Lunes: Informes.</b> Valor del pipeline por etapa, conversión por comercial, motivos de pérdida y previsión mensual.</li>
+    <li><b>Cada día: Hoy.</b> El bloque «Sin próxima acción» te dice qué oportunidades se están enfriando en todo el equipo.</li>
+    <li><b>Altas y bajas de personas</b> en Ajustes → Usuarios. Quien se va se desactiva, no se borra: su historial se conserva.</li>
+    <li><b>Permisos</b> en Ajustes → Roles y permisos, cuando cambie quién debe ver o hacer qué.</li>
+    <li><b>De vez en cuando:</b> registro de accesos (RGPD) y entregas de webhooks, para comprobar que todo fluye.</li>
+  </ol>
+  {% elif not p.sees_all %}
+  <ol class="howto">
+    <li><b>Empieza en Hoy.</b> Primero lo vencido, luego lo de hoy.</li>
+    <li><b>Deja «Sin próxima acción» a cero.</b> Toda oportunidad abierta necesita un siguiente paso con fecha.</li>
+    <li><b>Después de cada llamada o reunión,</b> escribe una nota en la oportunidad y programa el siguiente paso. Son veinte segundos.</li>
+    {% if capture_mailbox %}<li><b>Pon <span class="code">{{ capture_mailbox }}</span> en copia</b> de los correos con clientes: quedan guardados solos en su historial.</li>{% endif %}
+    <li><b>Mueve la etapa cuando cambie de verdad,</b> no antes: de ahí sale la previsión.</li>
+  </ol>
+  {% elif p.can_manage_pipeline and p.can_manage_catalog %}
+  <ol class="howto">
+    <li><b>Hoy</b> te enseña lo tuyo y, a la derecha, las oportunidades de cualquier persona que no tienen siguiente paso.</li>
+    <li><b>Pipeline con «Todo el equipo»</b> para la foto completa; cambia el filtro de persona para ver la cartera de cada uno.</li>
+    <li><b>Suscripciones y horas</b> para el recurrente en cartera (MRR), renovaciones y bolsas de horas abiertas.</li>
+    <li><b>Catálogo, etapas y plantillas</b> los puedes ajustar tú; los cambios afectan a todo el equipo.</li>
+    <li>Los <b>informes</b> están reservados al superusuario. Si los necesitas, pídeselos.</li>
+  </ol>
+  {% elif p.can_manage_pipeline %}
+  <ol class="howto">
+    <li><b>Cada mañana: Pipeline con «Todo el equipo».</b> Las tarjetas con la acción en rojo están vencidas; las de «+ Próxima acción» no tienen siguiente paso.</li>
+    <li><b>Filtra por persona</b> para repasar la cartera de cada comercial en vuestra reunión.</li>
+    <li><b>Reasigna</b> una oportunidad editándola y cambiando el responsable, o añade a alguien en «También asignada a».</li>
+    <li><b>Reparte los leads nuevos:</b> las empresas sin responsable las ve todo el mundo hasta que se asignan.</li>
+    <li><b>Cuida las etapas y los motivos de pérdida</b> (Ajustes): son la base de la previsión y del análisis de por qué se pierde.</li>
+  </ol>
+  {% elif p.can_manage_catalog %}
+  <ol class="howto">
+    <li><b>Mantén el catálogo al día</b> (Productos): precios, modelo de cobro y estado. Lo que esté «Retirado» deja de ofrecerse.</li>
+    <li><b>Pipeline filtrado por producto o familia</b> para ver qué se está vendiendo y en qué etapa se atasca.</li>
+    <li><b>Mira el origen</b> de cada oportunidad (feria, web, referido…): pide al equipo que lo rellene siempre.</li>
+    {% if p.can_export %}<li><b>Exporta</b> (Ajustes → Exportar todo) cuando necesites cruzar datos para una campaña.</li>{% endif %}
+    <li><b>Revisa la base legal</b> de los contactos antes de usarlos en comunicaciones: los marcados en ámbar no la tienen clara.</li>
+  </ol>
+  {% else %}
+  <ol class="howto">
+    <li><b>Empieza en Hoy</b> y deja «Sin próxima acción» a cero.</li>
+    <li><b>Pipeline con «Todo el equipo»</b> para la foto completa.</li>
+    <li><b>Registra</b> lo que pasa con cada cliente en su oportunidad.</li>
+  </ol>
+  {% endif %}
+</section>
+
+<section class="card" id="entrar">
+  <h2>Entrar</h2>
+  <p>No hay contraseña. Abre <span class="code">{{ site_host }}</span>, escribe tu correo de trabajo y te llega un código de seis cifras.</p>
+  <ol class="howto">
+    <li>Escribe tu correo y pulsa <b>Enviarme el código</b>.</li>
+    <li>Copia el código del correo. Vale 10 minutos y, mientras tanto, te sirve también para entrar desde otro dispositivo (el móvil, por ejemplo).</li>
+    <li>Solo se envía un código cada 10 minutos por persona. Si no llega, mira en correo no deseado y espera a que pasen para pedir otro.</li>
+  </ol>
+  <div class="shots two">{% shot "entrar" "Pantalla de entrada: solo tu correo" %}{% shot "codigo" "El código llega al correo en unos segundos" %}</div>
+  <p class="manual-tip">La sesión se mantiene abierta en ese dispositivo. En un equipo compartido, sal con el botón de la esquina inferior izquierda.</p>
+</section>
+
+<section class="card" id="hoy">
+  <h2>Hoy</h2>
+  <p>Tu pantalla de inicio. A la izquierda, tus tareas: vencidas, de hoy y de los próximos siete días. A la derecha, las oportunidades abiertas sin siguiente paso{% if p.sees_all %} de todo el equipo{% endif %} y la última actividad.</p>
+  {% shot shots.home "Hoy: tareas a la izquierda, oportunidades sin próxima acción a la derecha" %}
+  <ul class="manual-list">
+    <li>Marca el círculo de una tarea para darla por hecha.</li>
+    <li><b>+ Acción</b> programa el siguiente paso de una oportunidad sin salir de la pantalla.</li>
+    <li>Los números del menú avisan: naranja, tareas vencidas; ámbar, oportunidades sin próxima acción.</li>
+    <li><b>+ Tarea</b> y <b>+ Oportunidad</b> están siempre arriba a la derecha.</li>
+  </ul>
+</section>
+
+<section class="card" id="pipeline">
+  <h2>Pipeline</h2>
+  <p>Al entrar ves <b>tus oportunidades</b> (las que llevas o tienes asignadas), por etapa, tengas el rol que tengas.{% if p.sees_all %} Para ver las de otra persona o las de todos, cambia el filtro de persona a su nombre o a <b>«Todo el equipo»</b>.{% endif %} Cada columna suma lo que hay en juego: recurrente al mes, servicios por horas y pagos únicos, por separado.</p>
+  {% shot shots.pipeline "Tablero: una columna por etapa" %}
+  <ul class="manual-list">
+    <li><b>Arrastra una tarjeta</b> a otra columna para cambiarla de etapa. En el móvil, mantén pulsado y arrastra.</li>
+    <li>Al arrastrar aparecen abajo <b>Ganada</b> y <b>Perdida</b>. Perder pide siempre un motivo.</li>
+    <li>La etiqueta inferior de cada tarjeta es su próxima acción: verde, en plazo; roja, vencida; <b>+ Próxima acción</b>, no tiene.</li>
+    <li><b>Lista</b> (arriba a la derecha) enseña lo mismo en tabla, mejor para repasar muchas de una vez.</li>
+  </ul>
+  {% shot "lista" "La misma información en vista de lista" %}
+  <h3>Filtros</h3>
+  <p>Por estado (abiertas, ganadas, perdidas), persona, próxima acción (vencida, hoy, esta semana, sin acción), producto y prioridad. En <b>Más filtros</b>: familia de producto, responsable, etapa y fechas de cierre y de creación.{% if not p.sees_all %} El filtro de persona solo te servirá para tus oportunidades compartidas: no ves las de los demás.{% endif %}</p>
+  {% if ai_enabled %}<p class="manual-tip"><b>Buscar con IA:</b> escribe lo que quieres con tus palabras («lo de Plan Pro sin próxima acción de Ana», «propuestas que cierran este mes») y se aplican los filtros solos.</p>{% endif %}
+</section>
+
+<section class="card" id="oportunidad">
+  <h2>Oportunidad</h2>
+  <h3>Crear una</h3>
+  <ol class="howto">
+    <li>Pulsa <b>+ Oportunidad</b> y ponle título.</li>
+    <li><b>Empresa:</b> empieza a escribir su nombre, CIF o dominio y elígela de la lista. Si no existe, elige <b>＋ Crear empresa</b> y se da de alta al guardar, sin salir de la ventana. Al crearla aparece <b>Conocida en (feria o evento)</b> para indicar dónde la conociste.</li>
+    <li><b>Contacto:</b> búscalo igual, por nombre o correo. Si eliges uno, su empresa se rellena sola. Si es nuevo, elige <b>＋ Crear contacto</b> y completa nombre, apellidos, correo y móvil ahí mismo.</li>
+    <li>El responsable eres tú por defecto.{% if p.edits_all %} Puedes poner a otra persona.{% endif %} En «También asignada a» añades a quien deba verla y trabajarla contigo.</li>
+    <li>Prioridad, cierre estimado y origen (feria, web, referido…) son opcionales, pero el origen ayuda mucho a marketing.</li>
+  </ol>
+  <p class="manual-tip">Si escribes una empresa que ya existe con otro formato («ACME SL», «Acme, S.L.»), el CRM usa la que ya hay en vez de duplicarla.</p>
+  <div class="shots two">{% shot "nueva" "Nueva oportunidad: empresa y contacto con buscador y alta en la misma ventana" "tall" %}{% shot "perder" "Perder una oportunidad pide el motivo" %}</div>
+  <h3>Trabajarla</h3>
+  {% shot "oportunidad" "Ficha de oportunidad: etapas, importes, líneas, próxima acción, presupuestos e historial" %}
+  <ul class="manual-list">
+    <li><b>Etapas:</b> pulsa una para moverla. Al marcar <b>Ganada</b> se crean solas las suscripciones y las bolsas de horas de sus líneas, y la empresa pasa a cliente.</li>
+    <li><b>Líneas:</b> «Añadir producto» propone tipo de cobro, unidad y precio del catálogo. También puedes dejar «Sin producto: línea libre», elegir tú el tipo de cobro (recurrente, por horas o pago único) y describirla: sirve para lo que no está en el catálogo. Las recurrentes suman al MRR, las de horas a servicios y el resto a pago único. Precio vacío = «a consultar».</li>
+    <li><b>Próxima acción:</b> escribe qué toca, elige cuándo (hoy, mañana, en 3 días…) y quién. Es obligatoria en la práctica: si falta, la oportunidad sale señalada en Hoy y en el menú.</li>
+    <li><b>Parar:</b> si el cliente la deja en espera (presupuesto del año que viene, cambio de interlocutor…), pulsa <b>Parar</b>, indica el motivo y la <b>fecha de revisión</b>, obligatoria y como máximo a 90 días. Sigue en su etapa, sale atenuada en el tablero y ese día te aparece en Hoy para reanudarla, volver a pararla o darla por perdida. En el pipeline eliges verlas con el resto, ocultarlas o ver solo las paradas.</li>
+    <li><b>Historial:</b> elige Nota, Llamada, Correo o Reunión, escribe y pulsa <span class="code">Ctrl</span>+<span class="code">Enter</span>. Queda en la oportunidad y en la empresa.</li>
+  </ul>
+  {% shot "linea" "Añadir una línea libre: tipo de cobro, concepto y precio propios" %}
+  {% shot "parada" "Oportunidad parada por el cliente, con su fecha de revisión" %}
+  {% if not p.edits_all %}<p class="manual-tip">Si en una oportunidad no ves el botón Editar ni puedes mover la etapa, es que no es tuya: pide que te asignen.</p>{% endif %}
+</section>
+
+<section class="card" id="presupuestos">
+  <h2>Presupuestos</h2>
+  <p>Tienen sección propia en el menú. La lista enseña la última versión de cada presupuesto{% if not p.sees_all %} de tus oportunidades{% endif %}; búscalos por número, descripción o empresa.</p>
+  {% shot "presupuestos" "Presupuestos: última versión de cada uno, con su estado" %}
+  <h3>Crear</h3>
+  <ol class="howto">
+    <li>Pulsa <b>+ Presupuesto</b>, elige la oportunidad y la plantilla. También puedes empezar desde la propia oportunidad.</li>
+    <li>Se abre el editor con las líneas de la oportunidad ya cargadas. Ajusta lo que haga falta: descripción, dirección de facturación, fecha, validez, líneas, precios, descuentos, IVA y notas.</li>
+    <li><b>Líneas:</b> añade productos del catálogo o líneas libres. En la descripción, lo que empiece por guion sale como lista de puntos. Precio vacío = «A consultar».</li>
+    <li>Pulsa <b>Crear presupuesto</b>: se genera el PDF.</li>
+  </ol>
+  {% shot "presupuesto-editor" "Editor: datos del documento, cliente, líneas con totales al momento y notas" "tall" %}
+  <h3>Ver, editar y enviar</h3>
+  {% shot "presupuesto" "Ficha: vista previa del PDF, importe, estado y versiones" %}
+  <ul class="manual-list">
+    <li><b>Editar</b> no modifica el presupuesto: crea su <b>versión siguiente</b> (v2, v3…). La anterior queda tal como se emitió, con su PDF.</li>
+    <li><b>No se pueden borrar.</b> Si uno ya no vale, márcalo como rechazado o crea una versión nueva.</li>
+    <li><b>Enviar</b> lo manda por correo con el PDF adjunto. Va al contacto de la oportunidad, con el mensaje que escribas; el responsable y las personas asignadas van siempre en copia, y las respuestas del cliente te llegan a ti. Queda marcado como enviado y anotado en el historial de la empresa.</li>
+    <li><b>Estado:</b> borrador, enviado, aceptado o rechazado.</li>
+    <li><b>Número:</b> se propone el siguiente de la serie (P26 000001…). Al crear puedes cambiarlo para continuar una numeración que ya llevabas.</li>
+  </ul>
+  {% shot "presupuesto-enviar" "Envío por correo desde el CRM" %}
+  <p>El PDF lleva logo y datos del emisor, dirección de facturación, tabla de conceptos, base imponible, impuestos y total, y las notas al pie. Si mezcla cuotas, horas y pagos únicos, añade el desglose bajo el total.{% if p.can_manage_pipeline %} El emisor, el pie de página y los textos por defecto se cambian en Ajustes → Plantillas de presupuesto.{% endif %}</p>
+</section>
+
+<section class="card" id="empresas">
+  <h2>Empresas y contactos</h2>
+  <p>Una <b>empresa</b> es el cliente o posible cliente (empresa u organismo); un <b>contacto</b>, una persona de esa empresa. {% if p.sees_all %}Ves todas.{% else %}Ves las tuyas, las de tus oportunidades y las que aún no tienen responsable.{% endif %}</p>
+  {% shot "empresas" "Empresas: busca por nombre, CIF, dominio o persona" %}
+  {% shot "empresa" "Ficha de empresa: oportunidades, historial completo, personas y tareas" %}
+  <ul class="manual-list">
+    <li><b>Duplicados:</b> la ficha de una empresa avisa si existe otra con el mismo CIF, nombre o dominio de correo.{% if p.edits_all and p.can_delete %} Desde el aviso puedes <b>fusionarlas</b>: todo lo de una pasa a la otra.{% else %} Si ves el aviso, no la dupliques: avisa a tu responsable para que las fusione.{% endif %}</li>
+    <li><b>Conocida en:</b> en la ficha de la empresa puedes indicar la feria o el evento donde la conocisteis. En <b>Ferias y eventos</b> (menú) ves, por fecha, las empresas y oportunidades que ha dado cada uno. {% if p.can_manage_events %}Tu perfil puede dar de alta, corregir y borrar ferias y eventos.{% else %}Darlos de alta o cambiarlos corresponde a los Responsables Comerciales.{% endif %}</li>
+    <li><b>Empresa de un contacto nuevo:</b> en <b>Nuevo contacto</b>, busca su empresa por nombre; si no existe, elige <b>＋ Crear empresa</b> y se da de alta al guardar el contacto, indicando si quieres la feria o evento donde la conociste.</li>
+    <li><b>Base legal (RGPD):</b> cada contacto lleva la suya (interés legítimo, consentimiento…). En ámbar, la que falta por aclarar.</li>
+    {% if ai_enabled %}<li><b>Rellenar con IA:</b> al crear una empresa o un contacto, pega una firma de correo o una tarjeta y se rellenan los campos. Revísalos antes de guardar.</li>{% endif %}
+    {% if p.can_delete %}<li><b>Derecho de supresión:</b> si una persona pide que se borren sus datos, edita el contacto y pulsa <b>Suprimir datos (RGPD)</b>. Se eliminan sus datos personales y queda constancia en el registro.</li>{% else %}<li><b>Derecho de supresión:</b> si una persona pide que se borren sus datos, comunícalo a tu responsable; tu perfil no puede suprimirlos.</li>{% endif %}
+  </ul>
+  {% shot "contactos" "Contactos, con su base legal" %}
+  {% shot "eventos" "Ferias y eventos por fecha, con las empresas y oportunidades que ha dado cada uno" %}
+  {% if p.edits_all %}
+  <h3>Importar desde CSV</h3>
+  <p>En Empresas → <b>Importar CSV</b>. Admite empresas y personas en el mismo fichero. Usa siempre <b>Comprobar sin importar</b> primero: te dice cuántas son nuevas y cuántas ya existían. Lo que ya existe se completa, no se duplica, y nunca se pisa un dato ya relleno.</p>
+  {% shot "importar" "Importación: comprueba antes de guardar" %}
+  {% endif %}
+</section>
+
+<section class="card" id="actividad">
+  <h2>Actividad y correo</h2>
+  <p>El historial de una empresa junta todo lo ocurrido con ella: notas, llamadas, correos, reuniones, cambios de etapa y presupuestos, con quién y cuándo.</p>
+  {% if capture_mailbox %}
+  <h3>Captura automática de correo y reuniones</h3>
+  <ol class="howto">
+    <li>Cuando escribas a un cliente, pon <span class="code">{{ capture_mailbox }}</span> en copia (CC o CCO). Para guardar un correo recibido, reenvíalo a esa dirección.</li>
+    <li>En unos minutos aparece en el historial de la empresa, si el remitente o algún destinatario es un contacto del CRM.</li>
+    <li>Las convocatorias de reunión enviadas con esa dirección en copia se guardan como reunión.</li>
+  </ol>
+  <p class="manual-tip">Si un correo no aparece, casi siempre es porque la persona no está dada de alta como contacto. Créala y los siguientes entrarán solos.</p>
+  {% else %}<p class="manual-tip">La captura automática de correo aún no está activada en esta instalación.</p>{% endif %}
+</section>
+
+<section class="card" id="tareas">
+  <h2>Tareas y recordatorios</h2>
+  <p>Una tarea es algo con fecha y responsable. La próxima acción de una oportunidad es una tarea ligada a ella.</p>
+  {% shot "tareas" "Tareas: pendientes, vencidas, de hoy, de la semana y hechas" %}
+  <ul class="manual-list">
+    <li>Créalas desde <b>+ Tarea</b>, desde una oportunidad o desde una empresa.</li>
+    <li>Recibes por correo un resumen de tu día cada mañana de lunes a viernes, y un aviso de lo que vence.</li>
+    <li>{% if p.sees_all %}Con el selector de persona ves las tareas de cualquiera del equipo.{% else %}Ves las tareas que tienes asignadas, las que has creado y las de tus oportunidades.{% endif %}</li>
+  </ul>
+</section>
+
+<section class="card" id="productos">
+  <h2>Productos</h2>
+  <p>El catálogo, por familias. Tres modelos de cobro: <b>mensual</b> (recurrente), <b>por hora</b> y <b>pago único</b>. Los productos «a consultar» no tienen tarifa cerrada: el precio se pone en cada oportunidad.</p>
+  {% shot "productos" "Catálogo de productos" "tall" %}
+  {% if p.can_manage_catalog %}<ul class="manual-list">
+    <li>Pulsa un producto para editarlo; <b>+ Producto</b> y <b>+ Familia</b> para crear.</li>
+    <li>Estados: <b>activo</b> (se ofrece), <b>borrador</b> (en preparación) y <b>retirado</b> (ya no se vende; lo vendido se conserva).</li>
+    <li>Cambiar un precio no altera oportunidades ni presupuestos ya hechos: cada línea guarda el suyo.</li>
+  </ul>{% else %}<p class="manual-tip">Tu perfil consulta el catálogo pero no lo modifica. Si falta un producto o un precio está mal, avisa a quien lo gestiona.</p>{% endif %}
+</section>
+
+<section class="card" id="suscripciones">
+  <h2>Suscripciones y horas</h2>
+  <p>Lo que ya es cliente. Al ganar una oportunidad, sus líneas recurrentes se convierten en <b>suscripciones</b> y las de horas en <b>bolsas de horas</b>.{% if not p.sees_all %} Ves las de tus empresas.{% endif %}</p>
+  {% shot "suscripciones" "Recurrente en cartera y bolsas de horas" %}
+  <ul class="manual-list">
+    <li><b>Cambiar:</b> subida o bajada de plan, cantidad o precio. Queda registrado como expansión o contracción, con su fecha.</li>
+    <li><b>Baja:</b> cancela la suscripción y la saca del recurrente.</li>
+    <li><b>Apuntar horas:</b> descuenta horas de una bolsa cada vez que se presta el servicio. La barra enseña lo consumido.</li>
+  </ul>
+</section>
+
+{% if p.can_see_reports %}
+<section class="card" id="informes">
+  <h2>Informes</h2>
+  <p>Solo tú los ves. Nadie más, tenga el rol que tenga.</p>
+  {% shot "informes" "Informes: pipeline, conversión, pérdidas, recurrente y previsión" "tall" %}
+  <ul class="manual-list">
+    <li><b>Valor del pipeline por etapa:</b> recurrente, horas y pago único por separado, y el valor ponderado por probabilidad.</li>
+    <li><b>Conversión por comercial</b> y <b>ciclo medio de venta</b> (días de alta a ganada).</li>
+    <li><b>Motivos de pérdida:</b> salen de lo que el equipo indica al perder.</li>
+    <li><b>Recurrente, últimos 12 meses:</b> altas, expansión, contracción y bajas.</li>
+    <li><b>Previsión mensual</b> según la fecha de cierre estimada y la probabilidad de cada etapa.</li>
+  </ul>
+  <p class="manual-tip">Los informes son tan buenos como los datos: fecha de cierre, etapa real y motivo de pérdida.</p>
+</section>
+{% endif %}
+
+<section class="card" id="ajustes">
+  <h2>Ajustes</h2>
+  {% shot shots.settings "Ajustes, tal como los ve tu perfil" "tall" %}
+  <ul class="manual-list">
+    {% if p.is_superuser %}
+    <li><b>Usuarios:</b> alta con correo, nombre y rol. No hay contraseñas que repartir: entran con código. Para dar de baja, desactiva.</li>
+    <li><b>Roles y permisos:</b> pulsa un rol para decidir qué ve, qué edita y si borra, exporta, gestiona catálogo o configura etapas. Este manual se adapta solo a lo que pongas.</li>
+    <li><b>Webhooks:</b> avisan a otro sistema (facturación, ERP) cuando se gana una oportunidad o cambia una suscripción. Van firmados.</li>
+    <li><b>Registro de accesos (RGPD):</b> quién ha consultado, creado, exportado o suprimido qué.</li>
+    {% endif %}
+    {% if p.can_manage_pipeline %}
+    <li><b>Etapas del pipeline:</b> nombre, orden, color y probabilidad. La probabilidad alimenta la previsión.</li>
+    <li><b>Motivos de pérdida</b> y <b>plantillas de presupuesto</b> (introducción, condiciones, validez, IVA).</li>
+    {% endif %}
+    {% if p.edits_all %}<li><b>Importar CSV:</b> empresas y contactos en bloque.</li>{% endif %}
+    {% if p.can_export %}<li><b>Exportar todo (ZIP):</b> un CSV por tabla. Cada exportación queda en el registro de accesos.</li>{% endif %}
+    {% if p.can_use_api %}<li><b>Mis claves de API:</b> para conectar otra herramienta en tu nombre. La clave se muestra una sola vez y actúa con tus permisos, ni más ni menos. Revócala si deja de usarse.</li>{% endif %}
+    <li><b>Tema claro u oscuro:</b> botón del sol, abajo a la izquierda.</li>
+  </ul>
+</section>
+
+<section class="card" id="incentivos">
+  <h2>{% if p.can_manage_incentives %}Incentivos{% else %}Mis incentivos{% endif %}</h2>
+  <p>{% if p.can_manage_incentives %}Ves los incentivos de todo el equipo y puedes filtrarlos por persona. Tu perfil los da de alta, los valida, apunta lo cobrado y registra lo abonado.{% else %}Aquí ves lo que llevas ganado con los programas de incentivos. Solo ves los tuyos; los gestionan los Responsables Comerciales, la Dirección y el CEO.{% endif %}</p>
+  <ul class="manual-list">
+    <li><b>Ventas, cliente nuevo:</b> el 5 % del margen (facturación menos costes directos). Se devenga en proporción a lo que el cliente va pagando.</li>
+    <li><b>Ventas, cuota recurrente:</b> la media de las cuatro primeras cuotas, cuando se cobra la cuarta. Si el cliente se da de baja antes, no hay incentivo.</li>
+    <li><b>Project Managers:</b> 5 % del margen si se cumplen satisfacción del cliente (8 o más) y rentabilidad; +1 % por plazos y +1 % por costes.</li>
+    <li><b>Productividad y crecimiento:</b> fondo anual del 10 % del beneficio, si crece al menos un 15 %, repartido según tu nota (compañeros y dirección).</li>
+  </ul>
+  {% shot shots.incentives "Incentivos: lo previsto, lo devengado según lo cobrado, lo abonado y lo pendiente de validar" %}
+  <p>Las cuatro cifras de arriba: <b>previsto</b> (si se cobra todo lo aprobado), <b>devengado</b> (lo que ya corresponde según lo cobrado), <b>abonado</b> y <b>pendiente de validar</b>.</p>
+  <p class="manual-tip">Al ganar una oportunidad de un cliente nuevo, el CRM <b>propone solo</b> el incentivo de ventas a su responsable. Queda «pendiente de validar» hasta que {% if p.can_manage_incentives %}lo revises: completa los costes directos, comprueba los requisitos del programa y apruébalo o márcalo como «no procede»{% else %}lo revise quien gestiona incentivos{% endif %}.</p>
+</section>
+
+<section class="card" id="conocimiento">
+  <h2>Banco de conocimiento</h2>
+  <p>La documentación interna de la empresa: programas de incentivos, protocolos, retribución flexible, herramientas, infraestructura y formación. Está ordenada por categorías y tiene buscador, que mira también dentro del contenido.</p>
+  {% shot "conocimiento" "Banco de conocimiento: documentos por categoría, con buscador" %}
+  {% if p.can_manage_knowledge %}<ul class="manual-list">
+    <li><b>+ Documento</b> crea uno; <b>Editar</b>, dentro de cada documento, lo modifica. Se escribe en Markdown: <span class="code"># Título</span>, <span class="code">**negrita**</span>, listas con guion y tablas con barras.</li>
+    <li>Un documento se puede limitar a ciertos roles; sin marcar ninguno lo ve todo el equipo.</li>
+  </ul>{% else %}<p class="manual-tip">Si falta un documento o hay algo desactualizado, avisa a la Dirección: son quienes lo mantienen.</p>{% endif %}
+</section>
+
+{% if p.can_use_api %}
+<section class="card" id="asistente">
+  <h2>Asistente de IA (MCP)</h2>
+  <p>Puedes conectar un asistente de IA (Claude u otro compatible con MCP) al CRM y trabajar hablando: consultar, crear y actualizar sin abrir pantallas. El asistente actúa <b>con tus permisos</b>: ve lo que tú ves y solo cambia lo que tú puedes cambiar.</p>
+  <ol class="howto">
+    <li>En Claude (web, escritorio o móvil): Ajustes → Conectores → <b>Añadir conector personalizado</b>, y pega la dirección que tienes en Ajustes → <b>Asistente de IA (MCP)</b>.</li>
+    <li>Se abre el CRM: entra con tu correo, revisa lo que se pide y pulsa <b>Autorizar</b>. No hay claves que copiar.</li>
+    <li>Pídele cosas: «¿qué tengo para hoy?», «oportunidades sin próxima acción», «crea un lead de Operadora del Sur con Plan Plus y recuérdame llamar el jueves», «anota que he hablado con Marta y quiere demo».</li>
+  </ol>
+  <p>Para Claude Code y otros clientes que no usan ese flujo, se conecta con una clave personal (Ajustes → Mis claves de API); la instrucción exacta está en el mismo apartado.</p>
+  <ul class="manual-list">
+    <li><b>Consulta:</b> empresas, contactos, oportunidades, pipeline, tareas, historial, catálogo, presupuestos, suscripciones y bolsas de horas{% if p.can_see_reports %}, e informes{% endif %}.</li>
+    <li><b>Hace:</b> da de alta y actualiza empresas, contactos y oportunidades; añade líneas; mueve de etapa; anota llamadas, correos y reuniones; crea y cierra tareas; genera presupuestos; apunta horas{% if p.can_manage_catalog %}; gestiona el catálogo{% endif %}.</li>
+    <li><b>Enviar un presupuesto</b> es lo único con lo que escribe a un cliente, y te pedirá confirmación antes.</li>
+    <li>Todo lo que modifica queda en el registro de accesos, a tu nombre y marcado como hecho por asistente.</li>
+  </ul>
+  <p class="manual-tip">En Ajustes ves qué aplicaciones tienen acceso a tu cuenta y puedes retirárselo; si pierdes una clave, revócala ahí también. {% if p.is_superuser %}En Ajustes → Roles y permisos puedes recortar, por rol, qué herramientas ofrece el asistente.{% else %}Qué herramientas tienes disponibles lo decide el superusuario para tu rol.{% endif %}</p>
+</section>
+{% endif %}
+
+<section class="card" id="movil">
+  <h2>En el móvil</h2>
+  <p>Es la misma web, adaptada. Las secciones principales están en la barra inferior; el resto, en <b>Más</b>.</p>
+  <div class="shots three">{% shot "movil-hoy" "Hoy" "phone" %}{% shot "movil-pipeline" "Pipeline" "phone" %}{% shot "movil-oportunidad" "Oportunidad" "phone" %}</div>
+  {% if apk_version %}<h3>App para Android</h3>
+  <ol class="howto">
+    <li>Desde el móvil, con la sesión iniciada, pulsa <a class="link" href="{% url 'apk' %}"><b>Descargar la app (v{{ apk_version }})</b></a>. También está en Ajustes.</li>
+    <li>Abre el fichero descargado. Android pedirá permiso para instalar aplicaciones desde el navegador: acéptalo solo para esta instalación.</li>
+    <li>Abre QopenCRM desde el icono. Es la misma web a pantalla completa, con tu sesión.</li>
+  </ol>
+  <p class="manual-tip">La app necesita Chrome instalado y Android 7 o posterior. No se actualiza sola desde una tienda: cuando haya versión nueva se avisará para volver a descargarla, aunque casi nunca hará falta, porque el contenido es siempre la web al día.</p>
+  {% endif %}
+  <h3>{% if apk_version %}Sin instalar nada: acceso{% else %}Ponla{% endif %} en la pantalla de inicio</h3>
+  <ul class="manual-list">
+    <li><b>Android (Chrome):</b> menú ⋮ → «Añadir a pantalla de inicio» o «Instalar aplicación».</li>
+    <li><b>iPhone (Safari):</b> botón Compartir → «Añadir a pantalla de inicio».</li>
+  </ul>
+</section>
+
+<section class="card" id="dudas">
+  <h2>Dudas frecuentes</h2>
+  <dl class="manual-faq">
+    <dt>No me llega el código de acceso</dt><dd>Mira en correo no deseado y comprueba que escribes el correo con el que te dieron de alta. Se envía uno como mucho cada 10 minutos; tras cinco intentos fallidos hay que esperar al siguiente.</dd>
+    <dt>No veo una oportunidad que sé que existe</dt><dd>{% if p.sees_all %}Mira el filtro de estado: por defecto solo se enseñan las abiertas. Las ganadas y perdidas están en el mismo desplegable.{% else %}No es tuya ni estás asignado a ella. Pide a su responsable que te añada en «También asignada a».{% endif %}</dd>
+    <dt>He movido una oportunidad a la etapa equivocada</dt><dd>Vuelve a moverla: queda anotado en el historial. Si la marcaste como ganada, revisa en Suscripciones y horas lo que se creó.</dd>
+    <dt>¿Puedo borrar algo?</dt><dd>{% if p.can_delete %}Sí, desde el botón Borrar de cada ficha, y no se puede deshacer. Para un cliente que deja de serlo, mejor baja de la suscripción que borrar.{% else %}Tu perfil no borra registros. Si algo sobra, avisa a tu responsable.{% endif %}</dd>
+    <dt>¿Quién ve lo que escribo?</dt><dd>Quien ve esa empresa: su responsable, las personas asignadas a sus oportunidades y los perfiles que ven todo el equipo.</dd>
+  </dl>
+</section>
+
+</div>
+</div>
+{% endblock %}

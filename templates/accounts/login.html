@@ -1,0 +1,16 @@
+{% extends "base.html" %}{% load static %}
+{% block title %}Entrar · QopenCRM{% endblock %}
+{% block shell %}
+<div class="auth"><div class="gridbg"></div>
+  <div class="auth-card">
+    <img class="logo" src="{% static 'img/logo.png' %}" alt="QopenCRM">
+    <div><span class="eyebrow">QopenCRM</span><h1 style="margin-top:10px">Cada oportunidad, con su <em>próximo paso</em></h1></div>
+    <form class="panel" method="post">{% csrf_token %}
+      <div class="field"><label for="email">Tu correo de trabajo</label>
+        <input id="email" name="email" type="email" value="{{ email }}" autocomplete="email" inputmode="email" required autofocus placeholder="nombre@example.com"></div>
+      <button class="btn">Enviarme el código</button>
+      <p class="muted small">Sin contraseñas: te mandamos un código de 6 cifras al correo.</p>
+    </form>
+  </div>
+</div>
+{% endblock %}

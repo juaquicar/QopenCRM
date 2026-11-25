@@ -1,0 +1,25 @@
+{% extends "base.html" %}{% load crm %}
+{% block title %}Hoy · QopenCRM{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><span class="eyebrow">{{ now|date:"l j \d\e F" }}</span><h1 style="margin-top:8px">Hola, {{ user.first_name }}</h1>
+    <p class="lede">{% if overdue or today %}Tienes {{ overdue|length|add:today.count }} cosa{{ overdue|length|add:today.count|pluralize }} para hoy.{% else %}Nada pendiente para hoy.{% endif %} {{ my_opps_count }} oportunidad{{ my_opps_count|pluralize:"es" }} abierta{{ my_opps_count|pluralize }} a tu cargo.</p></div>
+  <div class="row"><button class="btn ghost" data-modal="{% url 'modal_new' 'task' %}">{% icon "plus" %}Tarea</button><button class="btn" data-modal="{% url 'modal_new' 'opportunity' %}">{% icon "plus" %}Oportunidad</button></div>
+</div>
+<div class="grid cols-2">
+  <div class="stack">
+    {% if overdue %}<section class="card" style="border-color:color-mix(in srgb,var(--bad) 45%,transparent)"><h2 style="color:var(--bad)">Vencidas · {{ overdue|length }}</h2>{% for t in overdue %}{% include "crm/_task.html" with show_context=1 %}{% endfor %}</section>{% endif %}
+    <section class="card"><h2>Hoy</h2>{% for t in today %}{% include "crm/_task.html" with show_context=1 %}{% empty %}<div class="empty">Nada programado para hoy.</div>{% endfor %}</section>
+    <section class="card"><h2>Próximos 7 días</h2>{% for t in upcoming %}{% include "crm/_task.html" with show_context=1 %}{% empty %}<div class="empty">Semana despejada.</div>{% endfor %}</section>
+  </div>
+  <div class="stack">
+    <section class="card"><div class="spread"><h2>Sin próxima acción</h2>{% if no_action %}<span class="chip warn">{{ no_action|length }}</span>{% endif %}</div>
+      <p class="muted small" style="margin-bottom:10px">Una oportunidad abierta sin siguiente paso se enfría. Ponle fecha.</p>
+      {% for o in no_action %}<div class="task"><div class="grow"><a href="{% url 'opportunity' o.pk %}"><b>{{ o.title }}</b></a><div class="meta"><span>{{ o.company }}</span><span>{{ o.stage }}</span>{% if o.owner_id != user.pk and o.owner %}<span>{{ o.owner }}</span>{% endif %}</div></div><button class="next none" data-modal="{% url 'task_next' o.pk %}">+ Acción</button></div>
+      {% empty %}<div class="empty">Todas las oportunidades abiertas tienen su próximo paso. Así se hace.</div>{% endfor %}
+    </section>
+    <section class="card"><h2>Última actividad</h2><div class="timeline">{% for a in recent %}{% include "crm/_activity.html" with show_company=1 %}{% empty %}<div class="empty">Aún no hay actividad registrada.</div>{% endfor %}</div></section>
+  </div>
+</div>
+{% endblock %}
+{% block fab %}<button class="fab" data-modal="{% url 'modal_new' 'opportunity' %}" aria-label="Nueva oportunidad">+</button>{% endblock %}

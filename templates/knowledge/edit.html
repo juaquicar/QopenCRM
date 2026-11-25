@@ -1,0 +1,19 @@
+{% extends "base.html" %}{% load crm %}
+{% block title %}{% if article %}Editar {{ article.title }}{% else %}Nuevo documento{% endif %} · QopenCRM{% endblock %}
+{% block content %}
+<div class="page-head"><div><a class="eyebrow" href="{% if article %}{% url 'article' article.slug %}{% else %}{% url 'articles' %}{% endif %}">Banco de conocimiento</a>
+  <h1 style="margin-top:8px">{% if article %}Editar documento{% else %}Nuevo documento{% endif %}</h1></div></div>
+<form method="post" class="card stack" style="max-width:980px">{% csrf_token %}
+  {% if form.non_field_errors %}<div class="alert">{{ form.non_field_errors }}</div>{% endif %}
+  <div class="form-grid two">
+    {% for field in form %}{% if field.widget_type == "checkbox" %}
+      <div class="field check">{{ field }}<label for="{{ field.id_for_label }}">{{ field.label }}</label></div>
+    {% else %}<div class="field {% if field.name == 'body' or field.name == 'title' or field.name == 'summary' or field.name == 'roles' %}full{% endif %}">
+      <label for="{{ field.id_for_label }}">{{ field.label }}{% if not field.field.required %} <span class="muted">· opcional</span>{% endif %}</label>{{ field }}
+      {% if field.help_text %}<span class="help">{{ field.help_text }}</span>{% endif %}{% for e in field.errors %}<span class="err">{{ e }}</span>{% endfor %}</div>
+    {% endif %}{% endfor %}
+  </div>
+  <div class="row"><button class="btn">Guardar</button><a class="btn ghost" href="{% if article %}{% url 'article' article.slug %}{% else %}{% url 'articles' %}{% endif %}">Cancelar</a></div>
+</form>
+{% if article %}<form method="post" action="{% url 'article_delete' article.slug %}" style="margin-top:14px" onsubmit="return confirm('¿Borrar este documento? No se puede deshacer.')">{% csrf_token %}<button class="btn danger sm">Borrar documento</button></form>{% endif %}
+{% endblock %}

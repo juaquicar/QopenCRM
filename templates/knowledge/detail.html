@@ -1,0 +1,10 @@
+{% extends "base.html" %}{% load crm %}
+{% block title %}{{ article.title }} · QopenCRM{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><a class="eyebrow" href="{% url 'articles' %}">Banco de conocimiento · {{ article.category }}</a><h1 style="margin-top:8px">{{ article.title }}</h1>
+    <p class="lede">Actualizado el {{ article.updated_at|date:"d/m/Y" }}{% if article.updated_by %} por {{ article.updated_by }}{% endif %}.{% if restricted %} Solo visible para: {{ restricted|join:", " }}.{% endif %}</p></div>
+  {% if user.can_manage_knowledge %}<a class="btn ghost" href="{% url 'article_edit' article.slug %}">{% icon "edit" %}Editar</a>{% endif %}
+</div>
+<article class="card prose">{{ html }}</article>
+{% endblock %}

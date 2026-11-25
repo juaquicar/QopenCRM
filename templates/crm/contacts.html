@@ -1,0 +1,16 @@
+{% extends "base.html" %}{% load crm %}
+{% block title %}Contactos · QopenCRM{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><span class="eyebrow">Personas</span><h1 style="margin-top:8px">Contactos</h1></div>
+  <button class="btn" data-modal="{% url 'modal_new' 'contact' %}">{% icon "plus" %}Contacto</button>
+</div>
+<form class="filters" hx-get="{% url 'contacts' %}" hx-target="#rows" hx-swap="outerHTML" hx-push-url="true" hx-trigger="change, input changed delay:300ms from:input[name=q]">
+  <div class="search"><input type="search" name="q" value="{{ filter.form.q.value|default:'' }}" placeholder="Buscar por nombre, correo, cargo o empresa…" aria-label="Buscar" autofocus></div>
+  {{ filter.form.legal_basis }}
+</form>
+<div class="card flush"><div class="table-wrap"><table>
+  <thead><tr><th>Persona</th><th>Empresa</th><th class="hide-m">Correo</th><th class="hide-m">Teléfono</th><th>RGPD</th><th></th></tr></thead>
+  {% include "crm/_contact_rows.html" %}
+</table></div></div>
+{% endblock %}

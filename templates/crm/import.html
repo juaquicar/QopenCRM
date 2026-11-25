@@ -1,0 +1,20 @@
+{% extends "base.html" %}{% load crm %}
+{% block title %}Importar · QopenCRM{% endblock %}
+{% block content %}
+<div class="page-head"><div><a class="eyebrow" href="{% url 'companies' %}">Empresas</a><h1 style="margin-top:8px">Importar CSV</h1>
+  <p class="lede">Empresas y personas en un mismo fichero. Lo que ya existe (mismo CIF, nombre, dominio o correo) se completa, no se duplica, y nunca se pisa un dato ya relleno.</p></div></div>
+<div class="grid cols-2">
+  <form class="card stack" method="post" enctype="multipart/form-data">{% csrf_token %}
+    <div class="field"><label for="file">Fichero CSV (coma o punto y coma, UTF-8 o Excel)</label><input id="file" type="file" name="file" accept=".csv,text/csv" required></div>
+    <div class="row"><button class="btn ghost" name="mode" value="preview">Comprobar sin importar</button><button class="btn" name="mode" value="import">Importar</button></div>
+    <p class="muted small">Columnas reconocidas: <span class="code">empresa</span> <span class="code">cif</span> <span class="code">web</span> <span class="code">sector</span> <span class="code">direccion</span> <span class="code">poblacion</span> <span class="code">provincia</span> <span class="code">nombre</span> <span class="code">apellidos</span> <span class="code">email</span> <span class="code">telefono</span> <span class="code">movil</span> <span class="code">cargo</span> <span class="code">base legal</span> <span class="code">consentimiento</span> <span class="code">notas</span></p>
+  </form>
+  {% if result %}<section class="card stack">
+    <h2>{% if result.dry_run %}Comprobación (no se ha guardado nada){% else %}Importación hecha{% endif %}</h2>
+    <dl class="kv num"><dt>Empresas nuevas</dt><dd><b>{{ result.stats.companies_new }}</b></dd><dt>Empresas ya existentes</dt><dd>{{ result.stats.companies_found }}</dd><dt>Personas nuevas</dt><dd><b>{{ result.stats.contacts_new }}</b></dd><dt>Personas ya existentes</dt><dd>{{ result.stats.contacts_found }}</dd><dt>Filas vacías</dt><dd>{{ result.stats.skipped }}</dd></dl>
+    {% if result.unknown %}<div class="alert">Columnas ignoradas: {% for u in result.unknown %}<span class="code">{{ u }}</span> {% endfor %}</div>{% endif %}
+    {% for e in result.errors %}<div class="small" style="color:var(--bad)">{{ e }}</div>{% endfor %}
+    {% if result.preview %}<div class="table-wrap"><table><thead><tr><th>Empresa</th><th>Persona</th><th>Correo</th></tr></thead><tbody>{% for p in result.preview %}<tr><td>{{ p.company }}</td><td>{{ p.contact }}</td><td>{{ p.email }}</td></tr>{% endfor %}</tbody></table></div>{% endif %}
+  </section>{% endif %}
+</div>
+{% endblock %}

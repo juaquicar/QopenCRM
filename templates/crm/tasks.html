@@ -1,0 +1,21 @@
+{% extends "base.html" %}{% load crm %}
+{% block title %}Tareas · QopenCRM{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><span class="eyebrow">Recordatorios</span><h1 style="margin-top:8px">Tareas</h1></div>
+  <button class="btn" data-modal="{% url 'modal_new' 'task' %}">{% icon "plus" %}Tarea</button>
+</div>
+<form class="filters" method="get">
+  <div class="seg">
+    <a href="{% qs when='' %}" class="{% if not when %}on{% endif %}">Pendientes</a>
+    <a href="{% qs when='overdue' %}" class="{% if when == 'overdue' %}on{% endif %}">Vencidas</a>
+    <a href="{% qs when='today' %}" class="{% if when == 'today' %}on{% endif %}">Hoy</a>
+    <a href="{% qs when='week' %}" class="{% if when == 'week' %}on{% endif %}">7 días</a>
+    <a href="{% qs when='done' %}" class="{% if when == 'done' %}on{% endif %}">Hechas</a>
+  </div>
+  {% if when %}<input type="hidden" name="when" value="{{ when }}">{% endif %}
+  <select name="assignee" onchange="this.form.submit()" aria-label="Responsable"><option value="">Todo el equipo</option>{% for u in users %}<option value="{{ u.pk }}" {% if assignee == u.pk|stringformat:"s" %}selected{% endif %}>{{ u }}</option>{% endfor %}</select>
+</form>
+<section class="card">{% for t in tasks %}{% include "crm/_task.html" with show_context=1 %}{% empty %}<div class="empty">Nada por aquí.</div>{% endfor %}</section>
+{% endblock %}
+{% block fab %}<button class="fab" data-modal="{% url 'modal_new' 'task' %}" aria-label="Nueva tarea">+</button>{% endblock %}

@@ -1,0 +1,48 @@
+{% extends "base.html" %}{% load crm %}
+{% block title %}{{ quote }} · QopenCRM{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><a class="eyebrow" href="{% url 'quotes' %}">Presupuestos</a><h1 style="margin-top:8px">{{ quote.number }} <span class="muted" style="font-size:.6em">v{{ quote.version }}</span></h1>
+    <p class="lede">{{ quote.title|default:opp.title }} · <a class="link" href="{% url 'company' opp.company_id %}">{{ opp.company.name }}</a></p></div>
+  <div class="row">
+    <a class="btn ghost" href="{% url 'quote_pdf' quote.pk %}" target="_blank">{% icon "pdf" %}PDF</a>
+    {% if can_edit %}<a class="btn ghost" href="{% url 'quote_edit' quote.pk %}">{% icon "edit" %}Editar</a>
+    <button class="btn" data-modal="{% url 'quote_send' quote.pk %}">{% icon "email" %}Enviar</button>{% endif %}
+  </div>
+</div>
+{% if not quote.is_latest %}<div class="alert" style="margin-bottom:16px"><b>Versión antigua.</b> <span>Hay una más reciente de este presupuesto; esta se conserva tal como se emitió.</span></div>{% endif %}
+<div class="grid cols-2">
+  <section class="card flush quote-preview">
+    <iframe src="{% url 'quote_pdf' quote.pk %}#toolbar=0&view=FitH" title="Vista previa del PDF" loading="lazy"></iframe>
+    <p class="muted small" style="padding:10px 16px">Si no ves la vista previa, <a class="link" href="{% url 'quote_pdf' quote.pk %}" target="_blank">abre el PDF</a>.</p>
+  </section>
+  <div class="stack">
+    <section class="card">
+      <h2>Importe</h2>
+      <dl class="kv num"><dt>Base imponible</dt><dd><b>{{ quote.base|eur }}</b></dd><dt>Impuestos ({{ quote.tax_rate|num }} %)</dt><dd>{{ quote.tax|eur }}</dd><dt>Total</dt><dd><b>{{ quote.total|eur }}</b></dd></dl>
+      {% if quote.is_mixed %}<p class="muted small" style="margin-top:10px">{{ quote.breakdown|join:" · " }}</p>{% endif %}
+    </section>
+    <section class="card">
+      <h2>Estado</h2>
+      <form method="post" action="{% url 'quote_status' quote.pk %}" class="row">{% csrf_token %}<input type="hidden" name="back" value="quote">
+        <select name="status" onchange="this.form.submit()" aria-label="Estado" style="flex:1;width:auto" {% if not can_edit %}disabled{% endif %}>{% for v, l in quote.Status.choices %}<option value="{{ v }}" {% if v == quote.status %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></form>
+      {% if quote.sent_at %}<p class="muted small" style="margin-top:10px">Enviado {{ quote.sent_at|due }} a {{ quote.sent_to }}.</p>{% else %}<p class="muted small" style="margin-top:10px">Aún no se ha enviado desde el CRM.</p>{% endif %}
+    </section>
+    <section class="card">
+      <h2>Datos</h2>
+      <dl class="kv"><dt>Oportunidad</dt><dd><a class="link" href="{% url 'opportunity' opp.pk %}">{{ opp.title }}</a></dd>
+        <dt>Fecha</dt><dd>{{ quote.issued_on|date:"d/m/Y" }}</dd>
+        {% if quote.valid_until %}<dt>Válido hasta</dt><dd>{{ quote.valid_until|date:"d/m/Y" }}</dd>{% endif %}
+        <dt>Plantilla</dt><dd>{{ quote.template|default:"—" }}</dd>
+        <dt>Autor</dt><dd>{{ quote.created_by.name|default:"—" }}</dd></dl>
+    </section>
+    <section class="card">
+      <h2>Versiones</h2>
+      {% for v in versions %}<div class="task"><div class="grow"><b>{% if v.pk == quote.pk %}v{{ v.version }} · esta{% else %}<a class="link" href="{% url 'quote' v.pk %}">v{{ v.version }}</a>{% endif %}</b>
+        <div class="meta"><span>{{ v.created_at|due }}</span><span>{{ v.created_by.name|default:"" }}</span><span>{{ v.base|eur }}</span><span>{{ v.get_status_display }}</span></div></div>
+        <a class="iconbtn" href="{% url 'quote_pdf' v.pk %}" target="_blank" title="Abrir PDF" aria-label="Abrir PDF de la versión {{ v.version }}">{% icon "pdf" %}</a></div>{% endfor %}
+      <p class="muted small" style="margin-top:10px">Los presupuestos no se borran: cada versión queda como se emitió.</p>
+    </section>
+  </div>
+</div>
+{% endblock %}

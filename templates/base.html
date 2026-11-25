@@ -1,0 +1,69 @@
+{% load static crm %}<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>{% block title %}QopenCRM{% endblock %}</title>
+<meta name="theme-color" content="#12141a">
+<link rel="manifest" href="{% url 'manifest' %}">
+<link rel="icon" href="{% static 'img/favicon.png' %}">
+<link rel="apple-touch-icon" href="{% static 'img/icon-192.png' %}">
+<script>try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend+Deca:wght@300;400;500;600&display=swap">
+<link rel="stylesheet" href="{% static 'css/app.css' %}">
+</head>
+<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+{% include "_icons.html" %}
+{% block shell %}
+<div class="shell">
+  <aside class="side">
+    <a class="brand" href="{% url 'home' %}"><img src="{% static 'img/icon-192.png' %}" alt=""><div><b>QopenCRM</b><span>CRM con IA</span></div></a>
+    <nav class="nav" aria-label="Principal">
+      {% with n=request.resolver_match.url_name %}
+      <a href="{% url 'home' %}" class="{% if n == 'home' %}on{% endif %}">{% icon "today" %}Hoy{% if nav_overdue %}<span class="count" title="Tareas vencidas">{{ nav_overdue }}</span>{% endif %}</a>
+      <a href="{% url 'pipeline' %}" class="{% if n == 'pipeline' or n == 'opportunity' %}on{% endif %}">{% icon "board" %}Pipeline{% if nav_no_action %}<span class="count warn" title="Oportunidades sin próxima acción">{{ nav_no_action }}</span>{% endif %}</a>
+      <a href="{% url 'quotes' %}" class="{% if n == 'quotes' or n == 'quote' or n == 'quote_new' or n == 'quote_edit' %}on{% endif %}">{% icon "pdf" %}Presupuestos</a>
+      <a href="{% url 'companies' %}" class="{% if n == 'companies' or n == 'company' %}on{% endif %}">{% icon "building" %}Empresas</a>
+      <a href="{% url 'contacts' %}" class="{% if n == 'contacts' %}on{% endif %}">{% icon "people" %}Contactos</a>
+      <a href="{% url 'tasks' %}" class="{% if n == 'tasks' %}on{% endif %}">{% icon "check" %}Tareas</a>
+      <div class="nav-sep"></div>
+      <a href="{% url 'events' %}" class="{% if n == 'events' or n == 'event' %}on{% endif %}">{% icon "meeting" %}Ferias y eventos</a>
+      <a href="{% url 'products' %}" class="{% if n == 'products' %}on{% endif %}">{% icon "box" %}Productos</a>
+      <a href="{% url 'subscriptions' %}" class="{% if n == 'subscriptions' %}on{% endif %}">{% icon "repeat" %}Suscripciones y horas</a>
+      {% if user.can_see_reports %}<a href="{% url 'reports' %}" class="{% if n == 'reports' %}on{% endif %}">{% icon "chart" %}Informes</a>{% endif %}
+      <a href="{% url 'settings' %}" class="{% if n == 'settings' or n == 'import' %}on{% endif %}">{% icon "gear" %}Ajustes</a>
+      <a href="{% url 'incentives' %}" class="{% if n == 'incentives' %}on{% endif %}">{% icon "coin" %}{% if user.can_manage_incentives %}Incentivos{% else %}Mis incentivos{% endif %}</a>
+      <a href="{% url 'articles' %}" class="{% if n == 'articles' or n == 'article' or n == 'article_new' or n == 'article_edit' %}on{% endif %}">{% icon "note" %}Banco de conocimiento</a>
+      <a href="{% url 'manual' %}" class="{% if n == 'manual' or n == 'manual_role' %}on{% endif %}">{% icon "book" %}Manual</a>
+      {% if nav_apk %}<a href="{% url 'apk' %}" title="Descargar la app para Android (v{{ nav_apk }})" download>{% icon "phone" %}App Android</a>{% endif %}
+      {% endwith %}
+    </nav>
+    <div class="side-foot">
+      <span class="avatar">{{ user.initials }}</span>
+      <div class="who"><b class="truncate">{{ user }}</b><span class="role" title="Tu rol en el CRM">{{ user.role_name }}</span></div>
+      <button class="iconbtn" data-theme-toggle title="Cambiar tema" aria-label="Cambiar tema">{% icon "sun" %}</button>
+      <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="iconbtn" title="Salir" aria-label="Salir">{% icon "exit" %}</button></form>
+    </div>
+  </aside>
+  <main class="main">{% block content %}{% endblock %}</main>
+</div>
+<nav class="tabbar" aria-label="Principal">
+  {% with n=request.resolver_match.url_name %}
+  <a href="{% url 'home' %}" class="{% if n == 'home' %}on{% endif %}">{% icon "today" %}Hoy{% if nav_overdue %}<span class="count">{{ nav_overdue }}</span>{% endif %}</a>
+  <a href="{% url 'pipeline' %}" class="{% if n == 'pipeline' or n == 'opportunity' %}on{% endif %}">{% icon "board" %}Pipeline</a>
+  <a href="{% url 'companies' %}" class="{% if n == 'companies' or n == 'company' %}on{% endif %}">{% icon "building" %}Empresas</a>
+  <a href="{% url 'tasks' %}" class="{% if n == 'tasks' %}on{% endif %}">{% icon "check" %}Tareas</a>
+  <a href="{% url 'settings' %}" class="{% if n == 'settings' or n == 'manual' or n == 'manual_role' %}on{% endif %}">{% icon "gear" %}Más</a>
+  {% endwith %}
+</nav>
+{% block fab %}{% endblock %}
+{% endblock %}
+<dialog class="modal" id="modal"><div id="modal-body"></div></dialog>
+<div class="toasts" id="toasts">{% for m in messages %}<div class="toast {{ m.tags }}">{{ m }}</div>{% endfor %}</div>
+<script src="{% static 'vendor/htmx.min.js' %}"></script>
+<script src="{% static 'vendor/sortable.min.js' %}"></script>
+<script src="{% static 'js/app.js' %}"></script>
+</body>
+</html>

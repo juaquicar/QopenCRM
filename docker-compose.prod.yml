@@ -1,0 +1,22 @@
+# Producción: proxy inverso con TLS delante de la web. qopencrm.sh lo añade solo cuando SITE_URL es https.
+services:
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    environment:
+      SITE_HOST: ${SITE_HOST:?falta SITE_HOST}
+    ports:
+      - "80:80"      # redirección a https y validación del certificado
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+
+volumes:
+  caddy_data:
+  caddy_config:

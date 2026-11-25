@@ -1,0 +1,8 @@
+{% load crm %}
+<div>
+  <header><h2>Próxima acción</h2><button type="button" class="iconbtn" data-close aria-label="Cerrar">{% icon "x" %}</button></header>
+  <div class="content">
+    <p class="muted small" style="margin-bottom:12px">{% if after_done %}Hecho. {% endif %}<b style="color:var(--fg)">{{ opp.title }}</b> ({{ opp.company }}) se queda sin siguiente paso. ¿Qué toca ahora?</p>
+    {% include "crm/_quick_next.html" %}
+  </div>
+</div>
