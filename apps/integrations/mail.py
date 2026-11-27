@@ -96,7 +96,9 @@ class Matcher:
         return address in self.users or address.split("@")[-1] in self.own_domains
 
     def contact_for(self, address, name=""):
-        contact = Contact.objects.filter(email=address, erased_at__isnull=True).select_related("company").first()
+        # el correo principal o cualquiera de los otros que tenga apuntados
+        contact = (Contact.objects.filter(email=address, erased_at__isnull=True).select_related("company").first()
+                   or Contact.objects.filter(channels__kind="email", channels__value=address, erased_at__isnull=True).select_related("company").first())
         if contact and contact.company_id:
             return contact
         domain = address.split("@")[-1]

@@ -1,12 +1,13 @@
 {% load crm %}
 <tbody id="rows">
-{% for c in page %}<tr>
-  <td><b>{{ c.full_name }}</b>{% if c.position %}<div class="muted small">{{ c.position }}</div>{% endif %}</td>
-  <td>{% if c.company %}<a class="link" href="{% url 'company' c.company_id %}">{{ c.company }}</a>{% else %}—{% endif %}</td>
-  <td class="hide-m">{% if c.email %}<a class="link" href="mailto:{{ c.email }}">{{ c.email }}</a>{% else %}—{% endif %}</td>
-  <td class="hide-m">{% if c.mobile or c.phone %}<a class="link" href="tel:{{ c.mobile|default:c.phone }}">{{ c.mobile|default:c.phone }}</a>{% else %}—{% endif %}</td>
-  <td>{% if c.erased_at %}<span class="chip bad">Suprimido</span>{% else %}<span class="chip {% if c.legal_basis == 'unknown' %}warn{% endif %}">{{ c.get_legal_basis_display }}</span>{% endif %}</td>
-  <td class="r">{% if not c.erased_at %}<button class="iconbtn" style="width:28px;height:28px;border:0;display:inline-grid" data-modal="{% url 'modal_edit' 'contact' c.pk %}" aria-label="Editar">{% icon "edit" %}</button>{% endif %}</td>
-</tr>{% empty %}<tr><td colspan="6"><div class="empty">Ningún contacto con estos filtros.</div></td></tr>{% endfor %}
-{% if page.has_next %}<tr hx-get="{% qs page=page.next_page_number %}" hx-trigger="revealed" hx-swap="outerHTML" hx-select="#rows > tr"><td colspan="6" class="muted small">Cargando más…</td></tr>{% endif %}
+{% for c in page %}{% with phones=c|contact_values:"phone" emails=c|contact_values:"email" %}<tr class="click" data-href="{% url 'contact' c.pk %}">
+  <td class="only-m c-av"><span class="avatar av" style="--h:{{ c.full_name|hue }}">{{ c.full_name|initials }}</span></td>
+  <td class="c-main"><b>{{ c.full_name }}</b>{% if c.position or c.company_id %}<div class="muted small truncate">{{ c.position }}<span class="only-m">{% if c.position and c.company_id %} · {% endif %}{{ c.company|default:"" }}</span></div>{% endif %}</td>
+  <td class="hide-m">{% for x in c.companies %}{% if not forloop.first %}<span class="muted">, </span>{% endif %}<a class="link" href="{% url 'company' x.pk %}">{{ x }}</a>{% empty %}—{% endfor %}</td>
+  <td class="hide-m">{% if emails %}<a class="link" href="mailto:{{ emails.0 }}">{{ emails.0 }}</a>{% if emails|length > 1 %} <span class="muted small" title="{{ emails|slice:'1:'|join:', ' }}">+{{ emails|length|add:"-1" }}</span>{% endif %}{% else %}—{% endif %}</td>
+  <td class="hide-m">{% if phones %}<a class="link" href="tel:{{ phones.0|phone_href }}">{{ phones.0 }}</a>{% if phones|length > 1 %} <span class="muted small" title="{{ phones|slice:'1:'|join:', ' }}">+{{ phones|length|add:"-1" }}</span>{% endif %}{% else %}—{% endif %}</td>
+  <td class="hide-m">{% if c.erased_at %}<span class="chip bad">Suprimido</span>{% else %}<span class="chip {% if c.legal_basis == 'unknown' %}warn{% endif %}">{{ c.get_legal_basis_display }}</span>{% endif %}</td>
+  <td class="r c-side">{% if phones %}<a class="iconbtn only-m" href="tel:{{ phones.0|phone_href }}" aria-label="Llamar a {{ c.full_name }}">{% icon "call" %}</a>{% elif emails %}<a class="iconbtn only-m" href="mailto:{{ emails.0 }}" aria-label="Escribir a {{ c.full_name }}">{% icon "email" %}</a>{% endif %}{% if not c.erased_at %}<button class="iconbtn hide-m" style="width:28px;height:28px;border:0;display:inline-grid" data-modal="{% url 'modal_edit' 'contact' c.pk %}" aria-label="Editar">{% icon "edit" %}</button>{% endif %}</td>
+</tr>{% endwith %}{% empty %}<tr class="none"><td colspan="7"><div class="empty">Ningún contacto con estos filtros.</div></td></tr>{% endfor %}
+{% if page.has_next %}<tr class="none" hx-get="{% qs page=page.next_page_number %}" hx-trigger="revealed" hx-swap="outerHTML" hx-select="#rows > tr"><td colspan="7" class="muted small">Cargando más…</td></tr>{% endif %}
 </tbody>

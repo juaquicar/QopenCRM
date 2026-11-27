@@ -1,0 +1,69 @@
+{% extends "base.html" %}{% load crm %}
+{% block title %}{{ contact.full_name }} · QopenCRM{% endblock %}
+{% block bar_title %}Contacto{% endblock %}
+{% block bar_actions %}{% if can_edit %}<button type="button" class="bar-btn" data-modal="{% url 'modal_edit' 'contact' contact.pk %}" aria-label="Editar">{% icon "edit" %}</button>{% endif %}{% endblock %}
+{% block fab %}{% if not contact.erased_at %}{% include "_dial.html" with company=contact.company %}{% endif %}{% endblock %}
+{% block content %}
+{% with phones=contact|contact_values:"phone" emails=contact|contact_values:"email" %}
+<div class="page-head">
+  <div class="hero grow">
+    <span class="avatar av xl" style="--h:{{ contact.full_name|hue }}">{{ contact.full_name|initials }}</span>
+    <div class="grow"><a class="eyebrow hide-m" href="{% url 'contacts' %}">Contactos</a>
+      <h1>{{ contact.full_name }}</h1>
+      {% if contact.position or contact.company_id %}<p class="lede">{{ contact.position }}{% if contact.position and contact.company_id %} · {% endif %}{% if contact.company_id %}<a class="link" href="{% url 'company' contact.company_id %}">{{ contact.company }}</a>{% endif %}</p>{% endif %}
+      <div class="row" style="margin-top:10px">
+        {% if contact.erased_at %}<span class="chip bad">Suprimido (RGPD)</span>{% else %}
+        {% if contact.is_primary %}<span class="chip accent">Contacto principal</span>{% endif %}
+        <span class="chip {% if contact.legal_basis == 'unknown' %}warn{% endif %}" title="Base legal RGPD">RGPD: {{ contact.get_legal_basis_display|lower }}</span>
+        {% if contact.consent_marketing %}<span class="chip ok">Acepta comunicaciones</span>{% endif %}{% endif %}
+        {% if contact.owner %}<span class="chip"><span class="avatar" style="width:18px;height:18px;font-size:8.5px">{{ contact.owner.initials }}</span>{{ contact.owner }}</span>{% endif %}
+      </div></div>
+  </div>
+  {% if can_edit %}<div class="row hide-m"><button class="btn ghost" data-modal="{% url 'modal_edit' 'contact' contact.pk %}">{% icon "edit" %}Editar</button>
+    <button class="btn" data-modal="{% url 'modal_new' 'opportunity' %}?contact={{ contact.pk }}{% if contact.company_id %}&company={{ contact.company_id }}{% endif %}">{% icon "plus" %}Oportunidad</button></div>{% endif %}
+</div>
+
+{% if not contact.erased_at %}<nav class="actions" aria-label="Acciones rápidas">
+  <a class="act" {% if phones %}href="tel:{{ phones.0|phone_href }}"{% else %}aria-disabled="true"{% endif %}><i>{% icon "call" %}</i>Llamar</a>
+  <a class="act" {% if phones %}href="https://wa.me/{{ phones.0|wa_href }}" target="_blank" rel="noopener"{% else %}aria-disabled="true"{% endif %}><i>{% icon "chat" %}</i>WhatsApp</a>
+  <a class="act" {% if emails %}href="mailto:{{ emails.0 }}"{% else %}aria-disabled="true"{% endif %}><i>{% icon "email" %}</i>Correo</a>
+  <a class="act" href="{% url 'contact_vcard' contact.pk %}" title="Guardar en la agenda del teléfono"><i>{% icon "addressbook" %}</i>A la agenda</a>
+</nav>{% endif %}
+
+<div class="grid cols-2 flat">
+  <div class="stack">
+    <section class="card">
+      <h2>Oportunidades</h2>
+      {% for o in opps %}<a class="task" href="{% url 'opportunity' o.pk %}"><div class="grow"><b>{{ o.title }}</b><div class="meta"><span class="chip" style="color:{{ o.stage.color }}"><i></i>{{ o.stage }}</span><span>{{ o.company }}</span>{% if o.amount_mrr %}<span>{{ o.amount_mrr|eur }}/mes</span>{% endif %}</div></div>
+        {% if o.stage.is_open %}<span class="next {{ o.next_action_at|due_class }}">{% if o.next_action_at %}{{ o.next_action_at|due }}{% else %}Sin próxima acción{% endif %}</span>{% endif %}</a>
+      {% empty %}<div class="empty">Sin oportunidades con esta persona.</div>{% endfor %}
+    </section>
+    <section class="card">
+      <h2>Lo hablado</h2>
+      <div class="timeline">{% for a in timeline %}{% include "crm/_activity.html" with show_opp=1 show_company=1 %}{% empty %}<div class="empty">Aún no hay llamadas, correos ni reuniones con esta persona.</div>{% endfor %}</div>
+    </section>
+  </div>
+  <div class="stack">
+    <section class="card first-m">
+      <h2>Contacto</h2>
+      {% for t in phones %}<a class="item" href="tel:{{ t|phone_href }}"><i class="ico">{% icon "call" %}</i><div class="grow"><b>{{ t }}</b><div class="muted small">{% if t == contact.mobile %}Móvil{% elif t == contact.phone %}Teléfono{% else %}Otro teléfono{% endif %}</div></div></a>{% endfor %}
+      {% for e in emails %}<a class="item" href="mailto:{{ e }}"><i class="ico">{% icon "email" %}</i><div class="grow"><b class="truncate" style="display:block">{{ e }}</b><div class="muted small">{% if forloop.first %}Correo principal{% else %}Otro correo{% endif %}</div></div></a>{% endfor %}
+      {% if not phones and not emails %}<div class="empty">Sin teléfono ni correo.{% if can_edit %} <button class="link" data-modal="{% url 'modal_edit' 'contact' contact.pk %}">Añadir</button>{% endif %}</div>{% endif %}
+    </section>
+    <section class="card">
+      <h2>Empresas</h2>
+      {% for x in contact.companies %}<a class="item" href="{% url 'company' x.pk %}"><span class="avatar av" style="--h:{{ x.name|hue }}">{{ x.name|initials }}</span><div class="grow"><b>{{ x.name }}</b><div class="muted small">{% if forloop.first and contact.company_id %}Empresa principal{% else %}También trabaja con ella{% endif %}</div></div>{% icon "chevron" %}</a>
+      {% empty %}<div class="empty">Sin empresa asociada.</div>{% endfor %}
+    </section>
+    {% if contact.notes or contact.consent_source %}<section class="card">
+      <h2>Notas</h2>
+      <dl class="kv">
+        {% if contact.notes %}<dt>Notas</dt><dd style="white-space:pre-wrap">{{ contact.notes }}</dd>{% endif %}
+        {% if contact.consent_source %}<dt>Consentimiento</dt><dd>{{ contact.consent_source }}{% if contact.consent_at %} · {{ contact.consent_at|short_date }}{% endif %}</dd>{% endif %}
+        <dt>Alta</dt><dd>{{ contact.created_at|short_date }}</dd>
+      </dl>
+    </section>{% endif %}
+  </div>
+</div>
+{% endwith %}
+{% endblock %}

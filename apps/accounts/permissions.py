@@ -12,17 +12,21 @@ def scope(queryset, user):
     name = queryset.model._meta.model_name
     own_opps = Opportunity.objects.filter(Q(owner=user) | Q(assignees=user)).values("pk")
     own_companies = Company.objects.filter(
-        Q(owner=user) | Q(owner__isnull=True) | Q(opportunities__in=own_opps) | Q(tasks__assignee=user)
+        Q(owner=user) | Q(owner__isnull=True) | Q(opportunities__in=own_opps) | Q(tasks__assignee=user) | Q(tasks__assignees=user)
     ).values("pk")
     if name == "company":
         return queryset.filter(pk__in=own_companies)
     if name == "opportunity":
         return queryset.filter(pk__in=own_opps)
     if name == "task":
-        return queryset.filter(Q(assignee=user) | Q(created_by=user) | Q(opportunity__in=own_opps))
-    if name in ("contact", "activity", "subscription", "hourbank"):
+        from apps.crm.models import Task
+        return queryset.filter(pk__in=Task.objects.filter(Task.for_user(user) | Q(created_by=user) | Q(opportunity__in=own_opps)).values("pk"))
+    if name == "contact":  # también las personas que trabajan con una de sus empresas aunque no sea la principal
+        from apps.crm.models import Contact
+        return queryset.filter(pk__in=Contact.objects.filter(Q(company__in=own_companies) | Q(other_companies__in=own_companies)).values("pk"))
+    if name in ("activity", "subscription", "hourbank"):
         return queryset.filter(company__in=own_companies)
-    if name == "quote":
+    if name in ("quote", "nda"):
         return queryset.filter(opportunity__in=own_opps)
     if name == "hourentry":
         return queryset.filter(bank__company__in=own_companies)

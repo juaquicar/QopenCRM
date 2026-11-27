@@ -5,18 +5,20 @@ import zipfile
 
 from apps.accounts.permissions import scope
 from apps.catalog.models import Product, ProductFamily
-from apps.sales.models import HourBank, HourEntry, Quote, Subscription, SubscriptionEvent
+from apps.sales.models import HourBank, HourEntry, Nda, Quote, Subscription, SubscriptionEvent
 
-from .models import Activity, Company, Contact, LossReason, Opportunity, OpportunityLine, Stage, Task
+from .models import Activity, Company, Contact, ContactChannel, LossReason, Opportunity, OpportunityLine, Stage, Task
 
-MODELS = [Company, Contact, Stage, LossReason, Opportunity, OpportunityLine, Activity, Task,
-          ProductFamily, Product, Subscription, SubscriptionEvent, HourBank, HourEntry, Quote]
+MODELS = [Company, Contact, ContactChannel, Stage, LossReason, Opportunity, OpportunityLine, Activity, Task,
+          ProductFamily, Product, Subscription, SubscriptionEvent, HourBank, HourEntry, Quote, Nda]
 
 
 def model_csv(model, user):
     queryset = scope(model.objects.all(), user)
     if model is OpportunityLine:
         queryset = queryset.filter(opportunity__in=scope(Opportunity.objects.all(), user))
+    if model is ContactChannel:
+        queryset = model.objects.filter(contact__in=scope(Contact.objects.all(), user))
     if model is SubscriptionEvent:
         queryset = queryset.filter(subscription__in=scope(Subscription.objects.all(), user))
     fields = [f for f in model._meta.concrete_fields]
@@ -38,4 +40,14 @@ def export_zip(user):
         writer.writerow(["opportunity_id", "user_id"])
         writer.writerows(Opportunity.assignees.through.objects.filter(opportunity__in=scope(Opportunity.objects.all(), user)).values_list("opportunity_id", "user_id"))
         archive.writestr("opportunity_assignees.csv", m2m.getvalue())
+        m2m = io.StringIO()
+        writer = csv.writer(m2m)
+        writer.writerow(["task_id", "user_id"])
+        writer.writerows(Task.assignees.through.objects.filter(task__in=scope(Task.objects.all(), user)).values_list("task_id", "user_id"))
+        archive.writestr("task_assignees.csv", m2m.getvalue())
+        m2m = io.StringIO()
+        writer = csv.writer(m2m)
+        writer.writerow(["contact_id", "company_id"])
+        writer.writerows(Contact.other_companies.through.objects.filter(contact__in=scope(Contact.objects.all(), user)).values_list("contact_id", "company_id"))
+        archive.writestr("contact_other_companies.csv", m2m.getvalue())
     return buffer.getvalue()

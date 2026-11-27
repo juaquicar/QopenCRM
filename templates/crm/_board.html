@@ -1,23 +1,24 @@
 {% load crm %}
 <div id="board">
 {% if view == "list" %}
-  <div class="card flush"><div class="table-wrap"><table>
+  <div class="card flush"><div class="table-wrap"><table class="mlist leads">
     <thead><tr><th>Oportunidad</th><th>Etapa</th><th class="r">MRR</th><th class="r hide-m">Horas</th><th class="r hide-m">Único</th><th>Próxima acción</th><th class="hide-m">Cierre</th><th class="hide-m">Resp.</th></tr></thead>
     <tbody>
     {% for o in opps %}
       <tr class="click" data-href="{% url 'opportunity' o.pk %}">
-        <td><b>{{ o.title }}</b><div class="muted small">{{ o.company }}</div></td>
-        <td><span class="chip" style="color:{{ o.stage.color }}"><i></i>{{ o.stage }}</span></td>
-        <td class="r num">{% if o.amount_mrr %}{{ o.amount_mrr|eur }}{% else %}—{% endif %}</td>
+        <td class="c-main"><b>{{ o.title }}</b><div class="muted small truncate">{{ o.company }}</div></td>
+        <td class="c-stage"><span class="chip" style="color:{{ o.stage.color }}"><i></i>{{ o.stage }}</span></td>
+        <td class="r num c-side">{% if o.amount_mrr %}{{ o.amount_mrr|eur }}<span class="only-m muted small">/mes</span>{% elif o.amount_services or o.amount_one_off %}<span class="only-m">{{ o.amount_services|add:o.amount_one_off|eur }}</span><span class="hide-m">—</span>{% else %}—{% endif %}</td>
         <td class="r num hide-m">{% if o.amount_services %}{{ o.amount_services|eur }}{% else %}—{% endif %}</td>
         <td class="r num hide-m">{% if o.amount_one_off %}{{ o.amount_one_off|eur }}{% else %}—{% endif %}</td>
-        <td>{% if o.on_hold %}<span class="next {% if o.hold_overdue %}late{% else %}hold{% endif %}" title="{{ o.on_hold_reason }}">Parada · revisar {{ o.on_hold_until|short_date }}</span>{% else %}{% with t=o.open_tasks.0 %}{% if t %}<span class="next {{ t.due_at|due_class }}">{{ t.title|truncatechars:26 }} · {{ t.due_at|due }}</span>{% elif o.stage.is_open %}<button class="next none" data-modal="{% url 'task_next' o.pk %}">+ Próxima acción</button>{% endif %}{% endwith %}{% endif %}</td>
+        <td class="c-next">{% if o.on_hold %}<span class="next {% if o.hold_overdue %}late{% else %}hold{% endif %}" title="{{ o.on_hold_reason }}">Parada · revisar {{ o.on_hold_until|short_date }}</span>{% else %}{% with t=o.open_tasks.0 %}{% if t %}<span class="next {{ t.due_at|due_class }}">{{ t.title|truncatechars:26 }} · {{ t.due_at|due }}</span>{% elif o.stage.is_open %}<button class="next none" data-modal="{% url 'task_next' o.pk %}">+ Próxima acción</button>{% endif %}{% endwith %}{% endif %}</td>
         <td class="hide-m">{{ o.expected_close|short_date }}</td>
         <td class="hide-m">{% if o.owner %}<span class="avatar" title="{{ o.owner }}">{{ o.owner.initials }}</span>{% endif %}</td>
       </tr>
     {% empty %}<tr><td colspan="8"><div class="empty">Ninguna oportunidad con estos filtros.</div></td></tr>{% endfor %}
     </tbody></table></div></div>
 {% else %}
+  <nav class="stage-tabs only-m" aria-label="Etapas">{% for col in columns %}<button type="button" data-stage-tab="{{ forloop.counter0 }}" style="--c:{{ col.stage.color }}" class="{% if forloop.first %}on{% endif %}">{{ col.stage.name }}<span>{{ col.items|length }}</span></button>{% endfor %}</nav>
   <div class="board">
   {% for col in columns %}
     <section class="col" style="--c:{{ col.stage.color }}">
@@ -26,7 +27,7 @@
         <div class="sums">{% if col.mrr %}{{ col.mrr|eur }}/mes{% endif %}{% if col.mrr and col.other %} · {% endif %}{% if col.other %}{{ col.other|eur }} puntual{% endif %}{% if not col.mrr and not col.other %}&nbsp;{% endif %}</div>
       </div>
       <div class="col-body" data-stage="{{ col.stage.pk }}">
-        {% for o in col.items %}{% include "crm/_deal.html" %}{% endfor %}
+        {% for o in col.items %}{% include "crm/_deal.html" %}{% empty %}<div class="empty only-m">Nada en esta etapa.</div>{% endfor %}
       </div>
     </section>
   {% endfor %}

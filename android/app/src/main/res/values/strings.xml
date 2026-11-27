@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">QopenCRM</string>
+    <!-- accesos directos al mantener pulsado el icono -->
+    <string name="sc_lead">Nuevo lead</string>
+    <string name="sc_contact">Nuevo contacto</string>
+    <string name="sc_company">Nueva empresa</string>
+    <string name="sc_search">Buscar</string>
 </resources>

@@ -135,6 +135,8 @@ EMAIL_USE_SSL = EMAIL_PORT == 465
 EMAIL_USE_TLS = not EMAIL_USE_SSL and env("EMAIL_USE_TLS", "1") == "1"
 EMAIL_TIMEOUT = 20
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "QopenCRM <crm@example.com>")
+# prefijo del asunto en los correos internos (códigos, recordatorios, menciones); no en los que van a clientes
+INTERNAL_EMAIL_PREFIX = env("INTERNAL_EMAIL_PREFIX", "[QopenCRM]")
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
@@ -179,3 +181,18 @@ ANDROID_SHA256 = [f.strip() for f in env("ANDROID_SHA256").split(",") if f.strip
 BRANDING_DIR = Path(env("BRANDING_DIR", str(BASE_DIR / "branding")))
 # Presupuestos: prefijo de la numeración (P26 000001, P26 000002…). Le sigue el año en dos cifras.
 QUOTE_NUMBER_PREFIX = env("QUOTE_NUMBER_PREFIX", "P")
+# NDA: datos de tu empresa como parte firmante del acuerdo de confidencialidad (se rige por la legislación española).
+# Dirección, cargo y ciudad de los tribunales admiten versión en inglés (…_EN); si falta, se usa la española.
+NDA_ISSUER = {
+    "name": env("NDA_ISSUER_NAME", "TU EMPRESA, S.L."),
+    "tax_id": env("NDA_ISSUER_TAX_ID", "B00000000"),
+    "signer": env("NDA_ISSUER_SIGNER", "Nombre Apellido"),
+    "address": {"es": env("NDA_ISSUER_ADDRESS", "Calle Ejemplo, 1, 00000 Ciudad")},
+    "position": {"es": env("NDA_ISSUER_POSITION", "Administrador único")},
+    "courts": {"es": env("NDA_ISSUER_COURTS", "Madrid")},
+}
+for _key, _default in (("address", ""), ("position", "Sole Director"), ("courts", "")):
+    NDA_ISSUER[_key]["en"] = env(f"NDA_ISSUER_{_key.upper()}_EN", "" if env(f"NDA_ISSUER_{_key.upper()}") else _default) or NDA_ISSUER[_key]["es"]
+
+# Precios del catálogo desde Stripe (manage.py sync_stripe). Mejor una clave restringida de solo lectura (rk_live_…)
+STRIPE_SECRET_KEY = env("STRIPE_SECRET_KEY")

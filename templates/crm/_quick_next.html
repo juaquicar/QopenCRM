@@ -10,8 +10,11 @@
     <label><input type="radio" name="quick" value="14">En 2 semanas</label>
     <input type="date" name="date" aria-label="Otra fecha" style="width:auto;min-height:30px;padding:3px 10px;border-radius:99px;font-size:12.5px">
   </div>
-  <div class="row">
-    <select name="assignee" aria-label="Responsable" style="width:auto;flex:1">{% for u in users %}<option value="{{ u.pk }}" {% if u.pk == user.pk %}selected{% endif %}>{{ u }}</option>{% endfor %}</select>
+  <div class="row who">
+    <fieldset class="people" aria-label="Para quién"><legend class="muted small">Para</legend>
+      <label><input type="checkbox" name="assignee" value="{{ user.pk }}" checked>Mí</label>
+      {% for u in users %}{% if u.pk != user.pk %}<label><input type="checkbox" name="assignee" value="{{ u.pk }}">{{ u }}</label>{% endif %}{% endfor %}
+    </fieldset>
     <button class="btn sm">Programar</button>
   </div>
 </form>

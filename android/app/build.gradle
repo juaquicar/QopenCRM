@@ -1,5 +1,6 @@
 // App Android de QopenCRM: una Trusted Web Activity que abre la web publicada a pantalla completa.
-// No lleva código propio: toda la aplicación es la web. El dominio se verifica con /.well-known/assetlinks.json.
+// No lleva código propio: toda la aplicación es la web (que en el móvil se presenta como app). Lo que sí pone el APK:
+// accesos directos del icono (res/xml/shortcuts.xml) y recibir texto compartido desde otras apps (share_target). El dominio se verifica con /.well-known/assetlinks.json.
 plugins {
     id 'com.android.application'
 }
@@ -17,6 +18,9 @@ android {
         versionCode((System.getenv("APP_VERSION_CODE") ?: "1") as Integer)
         versionName System.getenv("APP_VERSION_NAME") ?: "1.0.0"
         manifestPlaceholders = [crmHost: crmHost]
+        // debe coincidir con share_target de /manifest.webmanifest
+        resValue "string", "share_target",
+                "{ \\\"action\\\": \\\"https://${crmHost}/compartir/\\\", \\\"method\\\": \\\"GET\\\", \\\"enctype\\\": \\\"application/x-www-form-urlencoded\\\", \\\"params\\\": { \\\"title\\\": \\\"title\\\", \\\"text\\\": \\\"text\\\" } }"
         resValue "string", "asset_statements",
                 "[{ \\\"relation\\\": [\\\"delegate_permission/common.handle_all_urls\\\"], \\\"target\\\": { \\\"namespace\\\": \\\"web\\\", \\\"site\\\": \\\"https://${crmHost}\\\" } }]"
     }

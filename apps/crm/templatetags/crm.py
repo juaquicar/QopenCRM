@@ -1,3 +1,5 @@
+import re
+from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 
 from django import template
@@ -144,3 +146,78 @@ def quote_desc(value):
             out.append(f"<div>{escape(text)}</div>")
     flush()
     return mark_safe("".join(out))
+
+
+@register.filter
+def mentions(text):
+    """Resalta las menciones @usuario de un texto (escapado)."""
+    from django.utils.html import escape
+
+    from apps.crm.mentions import MENTION_RE
+
+    return mark_safe(MENTION_RE.sub(lambda m: f'<span class="mention">@{m.group(1)}</span>', escape(text or "")))
+
+
+MEETING_RE = re.compile(r"\AConvocada desde (?P<account>\S+) para (?P<attendees>[^\n]*?)\.?\n(?:Duración: (?P<minutes>\d+) min\n)?Enlace: (?P<url>https://\S+)(?:\n+(?P<message>.*))?\Z", re.S)
+
+
+@register.filter
+def meeting_info(activity):
+    """Datos de una reunión de Teams convocada desde el CRM, para pintarla como tarjeta con su botón de acceso."""
+    match = MEETING_RE.match(activity.body or "") if activity.source == "teams" else None
+    if not match:
+        return None
+    start = timezone.localtime(activity.occurred_at)
+    minutes = int(match["minutes"]) if match["minutes"] else None
+    end = start + timedelta(minutes=minutes) if minutes else None
+    when = f"{DAYS[start.weekday()]} {start.day} {MONTHS[start.month - 1]} {start.year}, {start:%H:%M}" + (f"–{end:%H:%M}" if end else "")
+    length = "" if not minutes else (f"{minutes} min" if minutes < 60 else f"{minutes // 60} h" + (f" {minutes % 60} min" if minutes % 60 else ""))
+    return {
+        "url": match["url"], "account": match["account"], "when": when, "length": length, "past": (end or start) < timezone.localtime(),
+        "attendees": [a.strip() for a in match["attendees"].split(",") if a.strip()], "message": (match["message"] or "").strip(),
+        "title": (activity.subject or "").removeprefix("Reunión de Teams convocada: "),
+    }
+
+
+@register.filter
+def teams_link(task):
+    """Enlace de Teams de una tarea de reunión convocada desde el CRM (va en sus notas)."""
+    notes = (task.notes or "").strip()
+    return notes.split()[0] if notes.startswith("https://teams.microsoft.com/") else ""
+
+
+@register.filter
+def contact_values(contact, kind):
+    """Todos los correos o teléfonos de un contacto, el principal primero."""
+    return contact.values(kind) if contact else []
+
+
+@register.filter
+def phone_href(value):
+    """Para tel:… solo cuentan cifras y el +; «91 000 00 00 centralita» → 910000000."""
+    import re as _re
+
+    match = _re.match(r"^[\s+\d().\-]+", value or "")
+    return _re.sub(r"[^\d+]", "", match.group(0)) if match else ""
+
+
+@register.filter
+def wa_href(value):
+    """Número para wa.me: solo cifras, con el prefijo de España si el número viene sin él."""
+    digits = phone_href(value).lstrip("+")
+    if digits.startswith("00"):
+        digits = digits[2:]
+    elif len(digits) == 9 and digits[0] in "6789":
+        digits = "34" + digits
+    return digits
+
+
+@register.filter
+def hue(value):
+    """Tono estable (0-359) a partir de un texto: el color del avatar de una empresa o una persona."""
+    return sum(ord(ch) * (i + 7) for i, ch in enumerate(str(value or ""))) % 360
+
+
+@register.filter
+def initials(value):
+    return "".join(word[0] for word in str(value or "").split()[:2]).upper()

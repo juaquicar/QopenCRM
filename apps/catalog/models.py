@@ -42,6 +42,11 @@ class Product(models.Model):
     is_addon = models.BooleanField("extra (p. ej. usuario adicional)", default=False)
     status = models.CharField("estado", max_length=8, choices=Status.choices, default=Status.ACTIVE)
     external_id = models.CharField("id externo", max_length=120, blank=True, db_index=True)
+    # precios que manda Stripe: cuota base mensual/anual en price/price_annual
+    # y precio por usuario según cuántos haya, en tramos: [{"up_to": 2, "month": 24.95, "year": 269.46}, …]
+    stripe_product_id = models.CharField("producto en Stripe", max_length=60, blank=True, db_index=True)
+    user_tiers = models.JSONField("precio por usuario (Stripe)", default=list, blank=True)
+    stripe_synced_at = models.DateTimeField("precios de Stripe a", null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

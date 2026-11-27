@@ -128,7 +128,9 @@ class Contact(Stamped):
         LEGITIMATE = "legitimate", "Interés legítimo"
         UNKNOWN = "unknown", "Sin determinar"
 
-    company = models.ForeignKey(Company, verbose_name="empresa", null=True, blank=True, on_delete=models.CASCADE, related_name="contacts")
+    company = models.ForeignKey(Company, verbose_name="empresa principal", null=True, blank=True, on_delete=models.CASCADE, related_name="contacts")
+    # una persona puede trabajar con varias empresas (consultor, grupo de empresas, cambio de puesto…)
+    other_companies = models.ManyToManyField(Company, verbose_name="otras empresas", blank=True, related_name="extra_contacts")
     first_name = models.CharField("nombre", max_length=80)
     last_name = models.CharField("apellidos", max_length=120, blank=True)
     position = models.CharField("cargo", max_length=120, blank=True)
@@ -162,14 +164,60 @@ class Contact(Stamped):
         self.email = (self.email or "").strip().lower()
         super().save(*args, **kwargs)
 
+    def works_at(self, company):
+        """¿Es de esa empresa (como principal o como una de las otras)?"""
+        return company is None or self.company_id == company.pk or self.other_companies.filter(pk=company.pk).exists()
+
+    def companies(self):
+        """La principal primero y luego las demás."""
+        others = [c for c in self.other_companies.all() if c.pk != self.company_id]
+        return ([self.company] if self.company_id else []) + others
+
+    def values(self, kind):
+        """Todos sus correos («email») o teléfonos («phone»), el principal primero, sin repetir."""
+        main = [self.email] if kind == "email" else [self.mobile, self.phone]
+        extra = [ch.value for ch in self.channels.all() if ch.kind == kind]
+        return list(dict.fromkeys(v for v in main + extra if v))
+
+    def set_channels(self, kind, values):
+        clean = [(v or "").strip().lower() if kind == "email" else (v or "").strip() for v in values]
+        main = {self.email} if kind == "email" else {self.mobile, self.phone}
+        self.channels.filter(kind=kind).delete()
+        ContactChannel.objects.bulk_create([ContactChannel(contact=self, kind=kind, value=v) for v in dict.fromkeys(clean) if v and v not in main])
+
     def erase(self):
         """Derecho de supresión: se anonimiza la persona y se conserva el histórico agregado."""
+        self.channels.all().delete()
         self.first_name, self.last_name = "Contacto", "suprimido"
         self.email = self.phone = self.mobile = self.position = self.notes = self.consent_source = ""
         self.consent_marketing = False
         self.erased_at = timezone.now()
         self.save()
         self.activities.update(body="", subject="(contenido suprimido por RGPD)", contact=None)
+
+
+class ContactChannel(models.Model):
+    """Correos y teléfonos de más de un contacto (los principales siguen en la ficha)."""
+
+    class Kind(models.TextChoices):
+        EMAIL = "email", "Correo"
+        PHONE = "phone", "Teléfono"
+
+    contact = models.ForeignKey(Contact, on_delete=models.CASCADE, related_name="channels")
+    kind = models.CharField(max_length=5, choices=Kind.choices)
+    value = models.CharField(max_length=200, db_index=True)
+
+    class Meta:
+        ordering = ["id"]
+        verbose_name = "correo o teléfono adicional"
+        verbose_name_plural = "correos y teléfonos adicionales"
+
+    def save(self, *args, **kwargs):
+        self.value = self.value.strip().lower() if self.kind == self.Kind.EMAIL else self.value.strip()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.value
 
 
 class Stage(models.Model):
@@ -458,6 +506,8 @@ class Task(Stamped):
     kind = models.CharField("tipo", max_length=8, choices=Kind.choices, default=Kind.TODO)
     due_at = models.DateTimeField("cuándo", db_index=True)
     assignee = models.ForeignKey(User, verbose_name="responsable", on_delete=models.CASCADE, related_name="tasks")
+    assignees = models.ManyToManyField(User, verbose_name="también para", blank=True, related_name="shared_tasks",
+                                       help_text="Otras personas que comparten esta acción: la ven en su Hoy y reciben el recordatorio.")
     created_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="created_tasks")
     company = models.ForeignKey(Company, verbose_name="empresa", null=True, blank=True, on_delete=models.CASCADE, related_name="tasks")
     opportunity = models.ForeignKey(Opportunity, verbose_name="oportunidad", null=True, blank=True, on_delete=models.CASCADE, related_name="tasks")
@@ -473,6 +523,29 @@ class Task(Stamped):
 
     def __str__(self):
         return self.title
+
+    @staticmethod
+    def for_user(user):
+        """Q de las tareas de una persona: responsable o compartida con ella."""
+        return Q(assignee=user) | Q(assignees=user)
+
+    @classmethod
+    def of(cls, user):
+        return cls.objects.filter(pk__in=cls.objects.filter(cls.for_user(user)).values("pk"))
+
+    def people(self):
+        """Responsable primero y luego el resto, sin repetir."""
+        return [self.assignee, *[u for u in self.assignees.all() if u.pk != self.assignee_id]]
+
+    def set_people(self, users):
+        """Primero de la lista = responsable; el resto, «también para»."""
+        users = list(dict.fromkeys(u for u in users if u))
+        if not users:
+            return
+        self.assignee = users[0]
+        if self.pk:
+            Task.objects.filter(pk=self.pk).update(assignee=users[0])
+            self.assignees.set(users[1:])
 
     @property
     def is_done(self):
@@ -504,3 +577,26 @@ class Task(Stamped):
                 company_id=self.company_id, opportunity=self.opportunity, user=user,
                 kind=Activity.Kind.SYSTEM, subject=f"Hecho: {self.title}",
             )
+
+
+class Notification(models.Model):
+    """Aviso para una persona: alguien la ha mencionado con @ en una nota o una tarea."""
+
+    recipient = models.ForeignKey(User, verbose_name="para", on_delete=models.CASCADE, related_name="notifications")
+    actor = models.ForeignKey(User, verbose_name="de", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    activity = models.ForeignKey(Activity, null=True, blank=True, on_delete=models.CASCADE, related_name="notifications")
+    task = models.ForeignKey(Task, null=True, blank=True, on_delete=models.CASCADE, related_name="notifications")
+    company = models.ForeignKey(Company, null=True, blank=True, on_delete=models.CASCADE, related_name="+")
+    opportunity = models.ForeignKey(Opportunity, null=True, blank=True, on_delete=models.CASCADE, related_name="+")
+    text = models.TextField("texto", blank=True)
+    url = models.CharField(max_length=200, blank=True)
+    read_at = models.DateTimeField("leído el", null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        verbose_name = "aviso"
+        verbose_name_plural = "avisos"
+
+    def __str__(self):
+        return f"{self.actor or 'Alguien'} → {self.recipient}"

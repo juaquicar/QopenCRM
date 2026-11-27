@@ -1,0 +1,17 @@
+{% extends "base.html" %}{% load crm %}
+{% block title %}Menciones · QopenCRM{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Menciones</h1><p class="lede">Notas y tareas en las que alguien te ha nombrado con @. También te llegan por correo.</p></div>
+  {% if nav_mentions %}<form method="post" action="{% url 'notifications_read' %}">{% csrf_token %}<button class="btn ghost">Marcar todo como leído</button></form>{% endif %}
+</div>
+<section class="card">
+  {% for n in page %}
+  {% include "crm/_mention.html" %}
+  {% empty %}<div class="empty">Nadie te ha mencionado todavía. Escribe @ en una nota o tarea para avisar a un compañero.</div>{% endfor %}
+</section>
+{% if page.has_other_pages %}<div class="row" style="margin-top:14px;justify-content:center">
+  {% if page.has_previous %}<a class="btn ghost sm" href="{% qs page=page.previous_page_number %}">Anteriores</a>{% endif %}
+  <span class="muted small">Página {{ page.number }} de {{ page.paginator.num_pages }}</span>
+  {% if page.has_next %}<a class="btn ghost sm" href="{% qs page=page.next_page_number %}">Siguientes</a>{% endif %}</div>{% endif %}
+{% endblock %}

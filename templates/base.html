@@ -1,33 +1,48 @@
 {% load static crm %}<!doctype html>
-<html lang="es">
+<html lang="es" data-depth="{% if nav_back %}1{% else %}0{% endif %}">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
 <title>{% block title %}QopenCRM{% endblock %}</title>
 <meta name="theme-color" content="#12141a">
 <link rel="manifest" href="{% url 'manifest' %}">
 <link rel="icon" href="{% static 'img/favicon.png' %}">
 <link rel="apple-touch-icon" href="{% static 'img/icon-192.png' %}">
-<script>try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<script>try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch(e){}
+/* móvil: al entrar en una ficha la pantalla llega desde la derecha, y al volver se va por donde vino */
+addEventListener("pagereveal",function(e){var to=+document.documentElement.dataset.depth,from=0;try{from=+sessionStorage.getItem("depth")||0;sessionStorage.setItem("depth",to)}catch(_){}
+  if(!e.viewTransition)return;var back=window.navigation&&navigation.activation&&navigation.activation.navigationType==="traverse";
+  if(to>from||(to&&from&&!back))e.viewTransition.types.add("forward");else if(to<from||(to&&from&&back))e.viewTransition.types.add("back")});</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend+Deca:wght@300;400;500;600&display=swap">
 <link rel="stylesheet" href="{% static 'css/app.css' %}">
 </head>
-<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+<body class="{% block body_class %}{% endblock %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
 {% include "_icons.html" %}
 {% block shell %}
+{# barra superior de la app (solo en el móvil): atrás o logotipo, título de la pantalla y sus acciones #}
+<header class="appbar">
+  {% if nav_back %}<a class="bar-btn" href="{{ nav_back }}" data-back aria-label="Atrás">{% icon "back" %}</a>
+  {% else %}<img class="bar-logo" src="{% static 'img/icon-192.png' %}" alt="">{% endif %}
+  <div class="bar-title truncate" id="bar-title">{% block bar_title %}{% endblock %}</div><script>(function(b){if(!b.textContent.trim())b.textContent=document.title.replace(/ · QopenCRM$/,"")})(document.getElementById("bar-title"))</script>
+  <div class="bar-actions">{% block bar_actions %}{% endblock %}
+    {% if not nav_back %}<a class="bar-btn" href="{% url 'search' %}" aria-label="Buscar">{% icon "search" %}</a>
+    <a class="bar-btn" href="{% url 'notifications' %}" aria-label="Menciones">{% icon "bell" %}{% if nav_mentions %}<span class="count">{{ nav_mentions }}</span>{% endif %}</a>{% endif %}
+  </div>
+</header>
 <div class="shell">
   <aside class="side">
     <a class="brand" href="{% url 'home' %}"><img src="{% static 'img/icon-192.png' %}" alt=""><div><b>QopenCRM</b><span>CRM con IA</span></div></a>
     <nav class="nav" aria-label="Principal">
       {% with n=request.resolver_match.url_name %}
       <a href="{% url 'home' %}" class="{% if n == 'home' %}on{% endif %}">{% icon "today" %}Hoy{% if nav_overdue %}<span class="count" title="Tareas vencidas">{{ nav_overdue }}</span>{% endif %}</a>
-      <a href="{% url 'pipeline' %}" class="{% if n == 'pipeline' or n == 'opportunity' %}on{% endif %}">{% icon "board" %}Pipeline{% if nav_no_action %}<span class="count warn" title="Oportunidades sin próxima acción">{{ nav_no_action }}</span>{% endif %}</a>
+      <a href="{% url 'pipeline' %}" class="{% if n == 'pipeline' or n == 'opportunity' %}on{% endif %}">{% icon "board" %}Leads{% if nav_no_action %}<span class="count warn" title="Oportunidades sin próxima acción">{{ nav_no_action }}</span>{% endif %}</a>
       <a href="{% url 'quotes' %}" class="{% if n == 'quotes' or n == 'quote' or n == 'quote_new' or n == 'quote_edit' %}on{% endif %}">{% icon "pdf" %}Presupuestos</a>
       <a href="{% url 'companies' %}" class="{% if n == 'companies' or n == 'company' %}on{% endif %}">{% icon "building" %}Empresas</a>
-      <a href="{% url 'contacts' %}" class="{% if n == 'contacts' %}on{% endif %}">{% icon "people" %}Contactos</a>
+      <a href="{% url 'contacts' %}" class="{% if n == 'contacts' or n == 'contact' %}on{% endif %}">{% icon "people" %}Contactos</a>
       <a href="{% url 'tasks' %}" class="{% if n == 'tasks' %}on{% endif %}">{% icon "check" %}Tareas</a>
+      <a href="{% url 'notifications' %}" class="{% if n == 'notifications' %}on{% endif %}">{% icon "bell" %}Menciones{% if nav_mentions %}<span class="count" title="Menciones sin leer">{{ nav_mentions }}</span>{% endif %}</a>
       <div class="nav-sep"></div>
       <a href="{% url 'events' %}" class="{% if n == 'events' or n == 'event' %}on{% endif %}">{% icon "meeting" %}Ferias y eventos</a>
       <a href="{% url 'products' %}" class="{% if n == 'products' %}on{% endif %}">{% icon "box" %}Productos</a>
@@ -49,18 +64,39 @@
   </aside>
   <main class="main">{% block content %}{% endblock %}</main>
 </div>
+{# navegación inferior de la app: lo de todos los días a un toque; el resto, en «Más» #}
 <nav class="tabbar" aria-label="Principal">
-  {% with n=request.resolver_match.url_name %}
-  <a href="{% url 'home' %}" class="{% if n == 'home' %}on{% endif %}">{% icon "today" %}Hoy{% if nav_overdue %}<span class="count">{{ nav_overdue }}</span>{% endif %}</a>
-  <a href="{% url 'pipeline' %}" class="{% if n == 'pipeline' or n == 'opportunity' %}on{% endif %}">{% icon "board" %}Pipeline</a>
-  <a href="{% url 'companies' %}" class="{% if n == 'companies' or n == 'company' %}on{% endif %}">{% icon "building" %}Empresas</a>
-  <a href="{% url 'tasks' %}" class="{% if n == 'tasks' %}on{% endif %}">{% icon "check" %}Tareas</a>
-  <a href="{% url 'settings' %}" class="{% if n == 'settings' or n == 'manual' or n == 'manual_role' %}on{% endif %}">{% icon "gear" %}Más</a>
-  {% endwith %}
+  <a href="{% url 'home' %}" class="{% if nav_tab == 'home' %}on{% endif %}"><i>{% icon "today" %}{% if nav_overdue %}<span class="count">{{ nav_overdue }}</span>{% endif %}</i>Hoy</a>
+  <a href="{% url 'pipeline' %}" class="{% if nav_tab == 'leads' %}on{% endif %}"><i>{% icon "board" %}</i>Leads</a>
+  <a href="{% url 'companies' %}" class="{% if nav_tab == 'companies' %}on{% endif %}"><i>{% icon "building" %}</i>Empresas</a>
+  <a href="{% url 'contacts' %}" class="{% if nav_tab == 'contacts' %}on{% endif %}"><i>{% icon "people" %}</i>Contactos</a>
+  <button type="button" data-sheet="#more" class="{% if nav_tab == 'more' %}on{% endif %}"><i>{% icon "more" %}</i>Más</button>
 </nav>
-{% block fab %}{% endblock %}
+{% block fab %}{% if nav_fab %}{% include "_dial.html" %}{% endif %}{% endblock %}
+<dialog class="sheet" id="more" aria-label="Más">
+  <div class="sheet-grip" data-grip></div>
+  <div class="sheet-user">
+    <span class="avatar">{{ user.initials }}</span>
+    <div class="grow"><b class="truncate">{{ user }}</b><div class="muted small">{{ user.role_name }}</div></div>
+    <button class="iconbtn" data-theme-toggle aria-label="Cambiar tema">{% icon "sun" %}</button>
+    <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="iconbtn" aria-label="Salir">{% icon "exit" %}</button></form>
+  </div>
+  <nav class="sheet-grid" aria-label="Más secciones">
+    <a href="{% url 'tasks' %}"><i>{% icon "check" %}{% if nav_overdue %}<span class="count">{{ nav_overdue }}</span>{% endif %}</i>Tareas</a>
+    <a href="{% url 'notifications' %}"><i>{% icon "bell" %}{% if nav_mentions %}<span class="count">{{ nav_mentions }}</span>{% endif %}</i>Menciones</a>
+    <a href="{% url 'quotes' %}"><i>{% icon "pdf" %}</i>Presupuestos</a>
+    <a href="{% url 'events' %}"><i>{% icon "meeting" %}</i>Ferias y eventos</a>
+    <a href="{% url 'products' %}"><i>{% icon "box" %}</i>Productos</a>
+    <a href="{% url 'subscriptions' %}"><i>{% icon "repeat" %}</i>Suscripciones</a>
+    {% if user.can_see_reports %}<a href="{% url 'reports' %}"><i>{% icon "chart" %}</i>Informes</a>{% endif %}
+    <a href="{% url 'incentives' %}"><i>{% icon "coin" %}</i>Incentivos</a>
+    <a href="{% url 'articles' %}"><i>{% icon "note" %}</i>Conocimiento</a>
+    <a href="{% url 'manual' %}"><i>{% icon "book" %}</i>Manual</a>
+    <a href="{% url 'settings' %}"><i>{% icon "gear" %}</i>Ajustes</a>
+  </nav>
+</dialog>
 {% endblock %}
-<dialog class="modal" id="modal"><div id="modal-body"></div></dialog>
+<dialog class="modal" id="modal"><div id="modal-body" tabindex="-1" autofocus></div></dialog>
 <div class="toasts" id="toasts">{% for m in messages %}<div class="toast {{ m.tags }}">{{ m }}</div>{% endfor %}</div>
 <script src="{% static 'vendor/htmx.min.js' %}"></script>
 <script src="{% static 'vendor/sortable.min.js' %}"></script>

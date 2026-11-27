@@ -1,4 +1,5 @@
-"""Proceso en segundo plano: recordatorios, resumen diario, reintentos de webhooks y captura de correo, cada 5 minutos."""
+"""Proceso en segundo plano: recordatorios, resumen diario, reintentos de webhooks y captura de correo, cada 5 minutos.
+Una vez al día, además, los precios del catálogo desde Stripe (si hay clave)."""
 import time
 from pathlib import Path
 
@@ -31,6 +32,10 @@ class Command(BaseCommand):
                     marker.write_text(today)
                 call_command("retry_webhooks")
                 call_command("sync_mail")
+                stripe_marker = marker.with_name("stripe")
+                if settings.STRIPE_SECRET_KEY and (not stripe_marker.exists() or stripe_marker.read_text() != today):
+                    stripe_marker.write_text(today)  # aunque falle: se reintenta mañana, no cada 5 minutos
+                    call_command("sync_stripe")
             except Exception as exc:  # un fallo puntual (SMTP, red) no debe parar el bucle
                 self.stderr.write(f"Error en la pasada: {exc}")
             time.sleep(options["interval"])

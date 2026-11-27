@@ -14,7 +14,7 @@
   <a href="#rutina">Tu rutina</a>
   <a href="#entrar">Entrar</a>
   <a href="#hoy">Hoy</a>
-  <a href="#pipeline">Pipeline</a>
+  <a href="#pipeline">Leads</a>
   <a href="#oportunidad">Oportunidad</a>
   <a href="#presupuestos">Presupuestos</a>
   <a href="#empresas">Empresas y contactos</a>
@@ -78,21 +78,22 @@
   <ol class="howto">
     <li><b>Empieza en Hoy.</b> Primero lo vencido, luego lo de hoy.</li>
     <li><b>Deja «Sin próxima acción» a cero.</b> Toda oportunidad abierta necesita un siguiente paso con fecha.</li>
-    <li><b>Después de cada llamada o reunión,</b> escribe una nota en la oportunidad y programa el siguiente paso. Son veinte segundos.</li>
+    <li><b>Después de cada llamada o reunión,</b> escribe una nota en la oportunidad y programa el siguiente paso. Son veinte segundos. En «Para» puedes marcar a varias personas: la acción sale en el Hoy de todas y a todas les llega el recordatorio.</li>
+    <li><b>¿Necesitas a un compañero?</b> Escribe <span class="code">@</span> en una nota o en las notas de una tarea y elige a la persona: le llega un aviso en «Menciones» y un correo con el texto y el enlace. Con <span class="code">@todos</span> avisas de una vez a quienes llevan el asunto: responsable y asignados del lead, y responsables de su empresa y de su contacto.</li>
     {% if capture_mailbox %}<li><b>Pon <span class="code">{{ capture_mailbox }}</span> en copia</b> de los correos con clientes: quedan guardados solos en su historial.</li>{% endif %}
     <li><b>Mueve la etapa cuando cambie de verdad,</b> no antes: de ahí sale la previsión.</li>
   </ol>
   {% elif p.can_manage_pipeline and p.can_manage_catalog %}
   <ol class="howto">
     <li><b>Hoy</b> te enseña lo tuyo y, a la derecha, las oportunidades de cualquier persona que no tienen siguiente paso.</li>
-    <li><b>Pipeline con «Todo el equipo»</b> para la foto completa; cambia el filtro de persona para ver la cartera de cada uno.</li>
+    <li><b>Leads con «Todo el equipo»</b> para la foto completa; cambia el filtro de persona para ver la cartera de cada uno.</li>
     <li><b>Suscripciones y horas</b> para el recurrente en cartera (MRR), renovaciones y bolsas de horas abiertas.</li>
     <li><b>Catálogo, etapas y plantillas</b> los puedes ajustar tú; los cambios afectan a todo el equipo.</li>
     <li>Los <b>informes</b> están reservados al superusuario. Si los necesitas, pídeselos.</li>
   </ol>
   {% elif p.can_manage_pipeline %}
   <ol class="howto">
-    <li><b>Cada mañana: Pipeline con «Todo el equipo».</b> Las tarjetas con la acción en rojo están vencidas; las de «+ Próxima acción» no tienen siguiente paso.</li>
+    <li><b>Cada mañana: Leads con «Todo el equipo».</b> Las tarjetas con la acción en rojo están vencidas; las de «+ Próxima acción» no tienen siguiente paso.</li>
     <li><b>Filtra por persona</b> para repasar la cartera de cada comercial en vuestra reunión.</li>
     <li><b>Reasigna</b> una oportunidad editándola y cambiando el responsable, o añade a alguien en «También asignada a».</li>
     <li><b>Reparte los leads nuevos:</b> las empresas sin responsable las ve todo el mundo hasta que se asignan.</li>
@@ -101,7 +102,7 @@
   {% elif p.can_manage_catalog %}
   <ol class="howto">
     <li><b>Mantén el catálogo al día</b> (Productos): precios, modelo de cobro y estado. Lo que esté «Retirado» deja de ofrecerse.</li>
-    <li><b>Pipeline filtrado por producto o familia</b> para ver qué se está vendiendo y en qué etapa se atasca.</li>
+    <li><b>Leads filtrado por producto o familia</b> para ver qué se está vendiendo y en qué etapa se atasca.</li>
     <li><b>Mira el origen</b> de cada oportunidad (feria, web, referido…): pide al equipo que lo rellene siempre.</li>
     {% if p.can_export %}<li><b>Exporta</b> (Ajustes → Exportar todo) cuando necesites cruzar datos para una campaña.</li>{% endif %}
     <li><b>Revisa la base legal</b> de los contactos antes de usarlos en comunicaciones: los marcados en ámbar no la tienen clara.</li>
@@ -109,7 +110,7 @@
   {% else %}
   <ol class="howto">
     <li><b>Empieza en Hoy</b> y deja «Sin próxima acción» a cero.</li>
-    <li><b>Pipeline con «Todo el equipo»</b> para la foto completa.</li>
+    <li><b>Leads con «Todo el equipo»</b> para la foto completa.</li>
     <li><b>Registra</b> lo que pasa con cada cliente en su oportunidad.</li>
   </ol>
   {% endif %}
@@ -140,11 +141,11 @@
 </section>
 
 <section class="card" id="pipeline">
-  <h2>Pipeline</h2>
+  <h2>Leads</h2>
   <p>Al entrar ves <b>tus oportunidades</b> (las que llevas o tienes asignadas), por etapa, tengas el rol que tengas.{% if p.sees_all %} Para ver las de otra persona o las de todos, cambia el filtro de persona a su nombre o a <b>«Todo el equipo»</b>.{% endif %} Cada columna suma lo que hay en juego: recurrente al mes, servicios por horas y pagos únicos, por separado.</p>
   {% shot shots.pipeline "Tablero: una columna por etapa" %}
   <ul class="manual-list">
-    <li><b>Arrastra una tarjeta</b> a otra columna para cambiarla de etapa. En el móvil, mantén pulsado y arrastra.</li>
+    <li><b>Arrastra una tarjeta</b> a otra columna para cambiarla de etapa. En el móvil, entra en el lead y toca la etapa nueva.</li>
     <li>Al arrastrar aparecen abajo <b>Ganada</b> y <b>Perdida</b>. Perder pide siempre un motivo.</li>
     <li>La etiqueta inferior de cada tarjeta es su próxima acción: verde, en plazo; roja, vencida; <b>+ Próxima acción</b>, no tiene.</li>
     <li><b>Lista</b> (arriba a la derecha) enseña lo mismo en tabla, mejor para repasar muchas de una vez.</li>
@@ -174,6 +175,7 @@
     <li><b>Líneas:</b> «Añadir producto» propone tipo de cobro, unidad y precio del catálogo. También puedes dejar «Sin producto: línea libre», elegir tú el tipo de cobro (recurrente, por horas o pago único) y describirla: sirve para lo que no está en el catálogo. Las recurrentes suman al MRR, las de horas a servicios y el resto a pago único. Precio vacío = «a consultar».</li>
     <li><b>Próxima acción:</b> escribe qué toca, elige cuándo (hoy, mañana, en 3 días…) y quién. Es obligatoria en la práctica: si falta, la oportunidad sale señalada en Hoy y en el menú.</li>
     <li><b>Parar:</b> si el cliente la deja en espera (presupuesto del año que viene, cambio de interlocutor…), pulsa <b>Parar</b>, indica el motivo y la <b>fecha de revisión</b>, obligatoria y como máximo a 90 días. Sigue en su etapa, sale atenuada en el tablero y ese día te aparece en Hoy para reanudarla, volver a pararla o darla por perdida. En el pipeline eliges verlas con el resto, ocultarlas o ver solo las paradas.</li>
+    <li><b>NDA:</b> en la tarjeta <b>NDA</b> pulsa <b>Generar NDA</b>, elige español o inglés y revisa la razón social, el domicilio, la identificación fiscal y quién firma por el cliente (salen de la empresa y del contacto). Se guarda el PDF del acuerdo marco de confidencialidad, listo para enviar a firmar.</li>
     <li><b>Historial:</b> elige Nota, Llamada, Correo o Reunión, escribe y pulsa <span class="code">Ctrl</span>+<span class="code">Enter</span>. Queda en la oportunidad y en la empresa.</li>
   </ul>
   {% shot "linea" "Añadir una línea libre: tipo de cobro, concepto y precio propios" %}
@@ -213,10 +215,10 @@
   {% shot "empresa" "Ficha de empresa: oportunidades, historial completo, personas y tareas" %}
   <ul class="manual-list">
     <li><b>Duplicados:</b> la ficha de una empresa avisa si existe otra con el mismo CIF, nombre o dominio de correo.{% if p.edits_all and p.can_delete %} Desde el aviso puedes <b>fusionarlas</b>: todo lo de una pasa a la otra.{% else %} Si ves el aviso, no la dupliques: avisa a tu responsable para que las fusione.{% endif %}</li>
-    <li><b>Conocida en:</b> en la ficha de la empresa puedes indicar la feria o el evento donde la conocisteis. En <b>Ferias y eventos</b> (menú) ves, por fecha, las empresas y oportunidades que ha dado cada uno. {% if p.can_manage_events %}Tu perfil puede dar de alta, corregir y borrar ferias y eventos.{% else %}Darlos de alta o cambiarlos corresponde a los Responsables Comerciales.{% endif %}</li>
+    <li><b>Conocida en:</b> en la ficha de la empresa puedes indicar la feria o el evento donde la conocisteis. En <b>Ferias y eventos</b> (menú) ves, por fecha, las empresas y oportunidades que ha dado cada uno. {% if p.can_manage_events %}Tu perfil puede dar de alta, corregir y borrar ferias y eventos.{% else %}Darlos de alta o cambiarlos corresponde al CEO, a los Directores y a los Responsables Comerciales.{% endif %}</li>
     <li><b>Empresa de un contacto nuevo:</b> en <b>Nuevo contacto</b>, busca su empresa por nombre; si no existe, elige <b>＋ Crear empresa</b> y se da de alta al guardar el contacto, indicando si quieres la feria o evento donde la conociste.</li>
     <li><b>Base legal (RGPD):</b> cada contacto lleva la suya (interés legítimo, consentimiento…). En ámbar, la que falta por aclarar.</li>
-    {% if ai_enabled %}<li><b>Rellenar con IA:</b> al crear una empresa o un contacto, pega una firma de correo o una tarjeta y se rellenan los campos. Revísalos antes de guardar.</li>{% endif %}
+    {% if ai_enabled %}<li><b>Rellenar con IA:</b> al crear una empresa o un contacto, pega una firma de correo o una tarjeta y pulsa <b>Rellenar desde el texto</b>; o escribe solo el nombre (o la web) y pulsa <b>Buscar en internet</b>: trae razón social, CIF, dirección, web y teléfono de fuentes públicas e indica de dónde salen. Solo completa los campos vacíos. Revísalos antes de guardar.</li>{% endif %}
     {% if p.can_delete %}<li><b>Derecho de supresión:</b> si una persona pide que se borren sus datos, edita el contacto y pulsa <b>Suprimir datos (RGPD)</b>. Se eliminan sus datos personales y queda constancia en el registro.</li>{% else %}<li><b>Derecho de supresión:</b> si una persona pide que se borren sus datos, comunícalo a tu responsable; tu perfil no puede suprimirlos.</li>{% endif %}
   </ul>
   {% shot "contactos" "Contactos, con su base legal" %}
@@ -358,15 +360,31 @@
 
 <section class="card" id="movil">
   <h2>En el móvil</h2>
-  <p>Es la misma web, adaptada. Las secciones principales están en la barra inferior; el resto, en <b>Más</b>.</p>
-  <div class="shots three">{% shot "movil-hoy" "Hoy" "phone" %}{% shot "movil-pipeline" "Pipeline" "phone" %}{% shot "movil-oportunidad" "Oportunidad" "phone" %}</div>
+  <p>En el móvil el CRM se usa como una app: barra superior con el título y el «atrás», navegación inferior y un botón <b>＋</b> para dar de alta.</p>
+  <div class="shots three">{% shot "movil-hoy" "Hoy" "phone" %}{% shot "movil-pipeline" "Leads por etapas" "phone" %}{% shot "movil-oportunidad" "Ficha de un lead" "phone" %}</div>
+  <ul class="manual-list">
+    <li><b>Abajo</b> están Hoy, Leads, Empresas y Contactos. En <b>Más</b>: tareas, menciones, presupuestos, ferias, productos, ajustes, el tema claro u oscuro y salir.</li>
+    <li><b>Arriba</b>: la lupa busca a la vez en oportunidades, empresas y contactos (también por teléfono o correo); la campana son tus menciones.</li>
+    <li>El botón <b>＋</b> despliega qué crear: lead, contacto, empresa o tarea. Dentro de una empresa o de un contacto, el alta sale ya asociada.</li>
+    <li><b>Leads</b>: cada etapa ocupa la pantalla; desliza a los lados o toca su nombre para cambiar de etapa. El icono de arriba alterna con la vista en lista. Para mover un lead de etapa, entra en él y toca la etapa nueva.</li>
+    <li><b>Fichas</b> de lead y de empresa: arriba, llamar, WhatsApp, correo, web o mapa con un toque; debajo, pestañas para no tener que bajar (seguimiento, líneas, datos).</li>
+    <li><b>Contactos</b>: el teléfono verde de la lista llama directamente. En la ficha, <b>A la agenda</b> guarda a la persona en los contactos del teléfono.</li>
+    <li>Al crear un contacto, <b>Traer de la agenda del móvil</b> rellena nombre, correos y teléfonos desde tus contactos (solo los de la persona que elijas).</li>
+    <li>Los formularios suben desde abajo: se cierran con Cancelar, con el «atrás» del teléfono o arrastrándolos hacia abajo.</li>
+  </ul>
+  <div class="shots three">{% shot "movil-contacto" "Ficha de un contacto" "phone" %}{% shot "movil-alta" "El botón ＋" "phone" %}{% shot "movil-mas" "Más" "phone" %}</div>
   {% if apk_version %}<h3>App para Android</h3>
   <ol class="howto">
     <li>Desde el móvil, con la sesión iniciada, pulsa <a class="link" href="{% url 'apk' %}"><b>Descargar la app (v{{ apk_version }})</b></a>. También está en Ajustes.</li>
     <li>Abre el fichero descargado. Android pedirá permiso para instalar aplicaciones desde el navegador: acéptalo solo para esta instalación.</li>
-    <li>Abre QopenCRM desde el icono. Es la misma web a pantalla completa, con tu sesión.</li>
+    <li>Abre QopenCRM desde el icono, con tu sesión.</li>
   </ol>
-  <p class="manual-tip">La app necesita Chrome instalado y Android 7 o posterior. No se actualiza sola desde una tienda: cuando haya versión nueva se avisará para volver a descargarla, aunque casi nunca hará falta, porque el contenido es siempre la web al día.</p>
+  <ul class="manual-list">
+    <li><b>Mantén pulsado el icono</b> de la app: Nuevo lead, Nuevo contacto, Nueva empresa y Buscar, sin pasar por el inicio.</li>
+    <li><b>Compartir con QopenCRM</b>: desde el correo, WhatsApp o el navegador, selecciona una firma o un texto, pulsa Compartir y elige QopenCRM. Se abre el alta de contacto, empresa o lead con ese texto{% if ai_enabled %} listo para que la IA rellene los campos{% endif %}.</li>
+    <li>Los enlaces al CRM que recibes por correo (recordatorios, menciones) se abren en la app.</li>
+  </ul>
+  <p class="manual-tip">La app necesita Chrome instalado y Android 7 o posterior. No se actualiza sola desde una tienda: cuando haya versión nueva se avisará para volver a descargarla (la 1.1 añade los accesos del icono y Compartir). Casi nunca hará falta: las pantallas son siempre las de la web al día.</p>
   {% endif %}
   <h3>{% if apk_version %}Sin instalar nada: acceso{% else %}Ponla{% endif %} en la pantalla de inicio</h3>
   <ul class="manual-list">

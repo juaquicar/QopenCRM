@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="{{ nda.language }}"><head><meta charset="utf-8"><title>{% block title %}{% endblock %}</title>
+<style>
+@font-face{font-family:"Lexend Deca"; src:url("file://{{ fonts }}/LexendDeca.ttf"); font-weight:100 900}
+@page{size:A4; margin:22mm 22mm 30mm 22mm;
+  @bottom-left{content:"{% block running %}{% endblock %}"; font:300 7.5pt "Lexend Deca","DejaVu Sans",sans-serif; color:#6b7280; border-top:.5pt solid #1b3a6b; padding-top:3mm; margin-top:8mm; width:82%; vertical-align:top}
+  @bottom-right{content:"{% block page %}{% endblock %} " counter(page) " / " counter(pages); font:300 7.5pt "Lexend Deca","DejaVu Sans",sans-serif; color:#6b7280; border-top:.5pt solid #1b3a6b; padding-top:3mm; margin-top:8mm; width:18%; text-align:right; vertical-align:top; white-space:nowrap}}
+*{box-sizing:border-box}
+body{margin:0; font:300 9.6pt/1.55 "Lexend Deca","DejaVu Sans",sans-serif; color:#1f2430; text-align:justify}
+b,strong{font-weight:600; color:#111}
+.head{display:flex; justify-content:space-between; align-items:center; border-bottom:.8pt solid #1b3a6b; padding-bottom:5mm}
+.head img{width:30mm}
+.head span{font-size:7.5pt; letter-spacing:.14em; text-transform:uppercase; color:#1b3a6b; font-weight:500}
+h1{font-size:15.5pt; line-height:1.25; font-weight:600; color:#111; text-align:center; margin:13mm 8mm 11mm; hyphens:none}
+h2{font-size:8.6pt; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#1b3a6b; text-align:left; margin:8mm 0 2.5mm; break-after:avoid; hyphens:none}
+h2.part{text-align:center; letter-spacing:.2em; margin-top:10mm}
+h3{font-size:9.6pt; font-weight:600; color:#111; margin:3.5mm 0 1mm; text-align:left; break-after:avoid}
+p{margin:0 0 2.6mm; orphans:2; widows:2}
+p.lead{break-after:avoid}
+ul,ol{margin:0 0 2.6mm; padding-left:6mm}
+li{margin-bottom:.9mm}
+ul{list-style:none}
+ul li::before{content:""; display:inline-block; width:1.3mm; height:1.3mm; background:#1b3a6b; margin:0 2.4mm .5mm -3.7mm}
+ol{list-style:lower-alpha}
+.party{border-left:1.6pt solid #1b3a6b; padding:1mm 0 1mm 4mm; margin-bottom:4mm; break-inside:avoid}
+.closing{break-inside:avoid}
+.sign{margin-top:9mm}
+.signers{display:flex; gap:12mm; margin-top:7mm; text-align:left}
+.signers > div{flex:1}
+.signers .box{height:27mm; border-bottom:.6pt solid #1f2430; margin-bottom:2.5mm}
+.signers .who{font-size:8.8pt; line-height:1.5}
+.signers .who span{color:#6b7280}
+</style></head><body>
+<header class="head"><img src="file://{{ logo }}" alt=""><span>{% block tag %}{% endblock %}</span></header>
+{% block body %}{% endblock %}
+</body></html>

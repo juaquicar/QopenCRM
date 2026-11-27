@@ -1,5 +1,8 @@
 {% extends "base.html" %}{% load crm %}
 {% block title %}{{ company.name }} · QopenCRM{% endblock %}
+{% block bar_title %}Empresa{% endblock %}
+{% block bar_actions %}{% if can_edit %}<button type="button" class="bar-btn" data-modal="{% url 'modal_edit' 'company' company.pk %}" aria-label="Editar">{% icon "edit" %}</button>{% endif %}{% endblock %}
+{% block fab %}{% include "_dial.html" %}{% endblock %}
 {% block content %}
 <div class="page-head">
   <div class="grow"><a class="eyebrow" href="{% url 'companies' %}">Empresas</a>
@@ -11,63 +14,76 @@
       {% if company.event %}<a class="chip accent" href="{% url 'event' company.event_id %}" title="Conocida en esta feria o evento">{{ company.event }}</a>{% endif %}
       {% if company.owner %}<span class="chip"><span class="avatar" style="width:18px;height:18px;font-size:8.5px">{{ company.owner.initials }}</span>{{ company.owner }}</span>{% endif %}
     </div></div>
-  <div class="row">{% if can_edit %}<button class="btn ghost" data-modal="{% url 'modal_edit' 'company' company.pk %}">{% icon "edit" %}Editar</button>{% endif %}
+  <div class="row hide-m">{% if can_edit %}<button class="btn ghost" data-modal="{% url 'modal_edit' 'company' company.pk %}">{% icon "edit" %}Editar</button>{% endif %}
     <button class="btn" data-modal="{% url 'modal_new' 'opportunity' %}?company={{ company.pk }}">{% icon "plus" %}Oportunidad</button></div>
 </div>
 
 {% if duplicates %}<div class="alert" style="margin-bottom:16px"><b>Posible duplicado:</b>
   {% for d in duplicates %}<span class="row"><a class="link" href="{% url 'company' d.pk %}">{{ d.name }}</a>{% if user.edits_all and user.can_delete %}<form method="post" action="{% url 'company_merge' company.pk d.pk %}" onsubmit="return confirm('Se pasará todo lo de «{{ d.name|escapejs }}» a esta empresa y la otra se borrará. ¿Fusionar?')">{% csrf_token %}<button class="btn ghost sm">Fusionar aquí</button></form>{% endif %}</span>{% endfor %}</div>{% endif %}
 
-<div class="grid cols-2">
+<nav class="actions only-m" aria-label="Acciones rápidas">
+  <a class="act" {% if company.phone %}href="tel:{{ company.phone|phone_href }}"{% else %}aria-disabled="true"{% endif %}><i>{% icon "call" %}</i>Llamar</a>
+  <a class="act" {% if company.email %}href="mailto:{{ company.email }}"{% else %}aria-disabled="true"{% endif %}><i>{% icon "email" %}</i>Correo</a>
+  <a class="act" {% if company.website %}href="{% if '://' not in company.website %}https://{% endif %}{{ company.website }}" target="_blank" rel="noopener noreferrer"{% else %}aria-disabled="true"{% endif %}><i>{% icon "globe" %}</i>Web</a>
+  <a class="act" {% if company.address or company.city %}href="https://www.google.com/maps/search/?api=1&query={{ company.address|add:' '|add:company.city|add:' '|add:company.province|urlencode }}" target="_blank" rel="noopener noreferrer"{% else %}aria-disabled="true"{% endif %}><i>{% icon "pin" %}</i>Mapa</a>
+</nav>
+<div class="tabs only-m" data-tabs>
+  <button type="button" class="on" data-tab="summary">Resumen</button>
+  <button type="button" data-tab="activity">Actividad</button>
+  <button type="button" data-tab="data">Ficha</button>
+</div>
+<div class="grid cols-2 flat">
   <div class="stack">
-    <section class="card">
+    <section class="card on" data-pane="summary">
       <div class="spread"><h2>Oportunidades</h2></div>
       {% for o in opps %}<a class="task" href="{% url 'opportunity' o.pk %}"><div class="grow"><b>{{ o.title }}</b><div class="meta"><span class="chip" style="color:{{ o.stage.color }}"><i></i>{{ o.stage }}</span>{% if o.amount_mrr %}<span>{{ o.amount_mrr|eur }}/mes</span>{% endif %}{% if o.amount_services %}<span>{{ o.amount_services|eur }} horas</span>{% endif %}{% if o.amount_one_off %}<span>{{ o.amount_one_off|eur }} único</span>{% endif %}</div></div>
         {% if o.stage.is_open %}<span class="next {{ o.next_action_at|due_class }}">{% if o.next_action_at %}{{ o.next_action_at|due }}{% else %}Sin próxima acción{% endif %}</span>{% endif %}</a>
       {% empty %}<div class="empty">Sin oportunidades. Crea la primera desde el botón de arriba.</div>{% endfor %}
     </section>
 
-    <section>
+    <section data-pane="activity">
       {% include "crm/_composer.html" %}
       <div class="timeline" id="timeline">{% for a in timeline %}{% include "crm/_activity.html" with show_opp=1 %}{% empty %}<div class="empty timeline-empty">Sin historial. Los correos y reuniones aparecerán aquí; también puedes registrar notas y llamadas.</div>{% endfor %}</div>
     </section>
   </div>
 
   <div class="stack">
-    <section class="card">
+    <section class="card on" data-pane="summary">
       <div class="spread"><h2>Personas</h2>{% if can_edit %}<button class="btn ghost sm" data-modal="{% url 'modal_new' 'contact' %}?company={{ company.pk }}">{% icon "plus" %}Añadir</button>{% endif %}</div>
-      {% for c in contacts %}<div class="task"><span class="avatar">{{ c.first_name|slice:":1"|upper }}{{ c.last_name|slice:":1"|upper }}</span>
-        <div class="grow"><b>{{ c.full_name }}</b>{% if c.is_primary %} <span class="chip accent">Principal</span>{% endif %}
-          <div class="meta">{% if c.position %}<span>{{ c.position }}</span>{% endif %}{% if c.email %}<a class="link" href="mailto:{{ c.email }}">{{ c.email }}</a>{% endif %}{% if c.mobile or c.phone %}<a class="link" href="tel:{{ c.mobile|default:c.phone }}">{{ c.mobile|default:c.phone }}</a>{% endif %}</div>
+      {% for c in contacts %}<div class="task"><span class="avatar av" style="--h:{{ c.full_name|hue }}">{{ c.first_name|slice:":1"|upper }}{{ c.last_name|slice:":1"|upper }}</span>
+        <div class="grow"><a href="{% url 'contact' c.pk %}"><b>{{ c.full_name }}</b></a>{% if c.is_primary and c.company_id == company.pk %} <span class="chip accent">Principal</span>{% endif %}
+          {% if c.company_id != company.pk %}<div class="muted small">También en esta empresa{% if c.company %} · principal: <a class="link" href="{% url 'company' c.company_id %}">{{ c.company }}</a>{% endif %}</div>{% endif %}
+          <div class="meta">{% if c.position %}<span>{{ c.position }}</span>{% endif %}{% for e in c|contact_values:"email" %}<a class="link" href="mailto:{{ e }}">{{ e }}</a>{% endfor %}{% for t in c|contact_values:"phone" %}<a class="link" href="tel:{{ t|phone_href }}">{{ t }}</a>{% endfor %}</div>
           <div class="meta" style="margin-top:3px">{% if c.erased_at %}<span class="chip bad">Suprimido (RGPD)</span>{% else %}<span class="chip {% if c.legal_basis == 'unknown' %}warn{% endif %}" title="Base legal RGPD">{{ c.get_legal_basis_display }}</span>{% if c.consent_marketing %}<span class="chip ok">Acepta comunicaciones</span>{% endif %}{% endif %}</div></div>
-        {% if can_edit and not c.erased_at %}<button class="iconbtn" style="width:28px;height:28px;border:0" data-modal="{% url 'modal_edit' 'contact' c.pk %}" aria-label="Editar contacto">{% icon "edit" %}</button>{% endif %}</div>
+        {% with phones=c|contact_values:"phone" %}{% if phones %}<a class="iconbtn only-m" href="tel:{{ phones.0|phone_href }}" aria-label="Llamar a {{ c.full_name }}">{% icon "call" %}</a>{% endif %}{% endwith %}
+        {% if can_edit and not c.erased_at %}<button class="iconbtn hide-m" style="width:28px;height:28px;border:0" data-modal="{% url 'modal_edit' 'contact' c.pk %}" aria-label="Editar contacto">{% icon "edit" %}</button>{% endif %}</div>
       {% empty %}<div class="empty">Sin personas asociadas.</div>{% endfor %}
     </section>
 
-    <section class="card">
+    <section class="card on" data-pane="summary">
       <h2>Tareas</h2>
       {% for t in tasks %}{% include "crm/_task.html" with show_context=1 %}{% empty %}<p class="muted small">Nada pendiente con esta empresa.</p>{% endfor %}
       <div style="margin-top:12px">{% include "crm/_quick_next.html" with opp=None %}</div>
     </section>
 
-    {% if subscriptions %}<section class="card"><h2>Suscripciones</h2>
+    {% if subscriptions %}<section class="card" data-pane="data"><h2>Suscripciones</h2>
       {% for s in subscriptions %}<div class="task"><div class="grow"><b>{{ s.plan_name }}</b><div class="meta"><span>{{ s.quantity|num }} × {{ s.unit_price|eur }} · {{ s.get_period_display|lower }}</span>{% if s.renews_on and s.status == 'active' %}<span>Renueva {{ s.renews_on|short_date }}</span>{% endif %}</div></div>
         <span class="chip {% if s.status == 'active' %}ok{% elif s.status == 'cancelled' %}bad{% endif %}">{% if s.status == 'active' %}{{ s.mrr|eur }}/mes{% else %}{{ s.get_status_display }}{% endif %}</span></div>{% endfor %}
     </section>{% endif %}
 
-    {% if hour_banks %}<section class="card"><h2>Bolsas de horas</h2>
+    {% if hour_banks %}<section class="card" data-pane="data"><h2>Bolsas de horas</h2>
       {% for b in hour_banks %}<div style="padding:8px 0"><div class="spread"><b>{{ b.name }}</b><span class="num small">{{ b.hours_used|num }} / {{ b.hours_sold|num }} h</span></div>
         <div class="bar" style="margin-top:6px"><i style="width:{{ b.used_pct }}%;{% if b.used_pct >= 90 %}background:var(--bad){% elif b.used_pct >= 70 %}background:var(--warn){% endif %}"></i></div>
         <div class="spread small muted" style="margin-top:4px"><span>Quedan {{ b.hours_left|num }} h</span><button class="link small" data-modal="{% url 'modal_new' 'hourentry' %}?bank={{ b.pk }}">Apuntar horas</button></div></div>{% endfor %}
     </section>{% endif %}
 
-    <section class="card">
+    <section class="card" data-pane="data">
       <h2>Ficha</h2>
       <dl class="kv">
         {% if company.tax_id %}<dt>CIF</dt><dd>{{ company.tax_id }}</dd>{% endif %}
         {% if company.website %}<dt>Web</dt><dd><a class="link" href="{% if '://' not in company.website %}https://{% endif %}{{ company.website }}" target="_blank" rel="noopener noreferrer">{{ company.website }}</a></dd>{% endif %}
         {% if company.email %}<dt>Correo</dt><dd><a class="link" href="mailto:{{ company.email }}">{{ company.email }}</a></dd>{% endif %}
-        {% if company.phone %}<dt>Teléfono</dt><dd><a class="link" href="tel:{{ company.phone }}">{{ company.phone }}</a></dd>{% endif %}
+        {% if company.phone %}<dt>Teléfono</dt><dd><a class="link" href="tel:{{ company.phone|phone_href }}">{{ company.phone }}</a></dd>{% endif %}
         {% if company.address %}<dt>Dirección</dt><dd>{{ company.address }}</dd>{% endif %}
         <dt>Alta</dt><dd>{{ company.created_at|short_date }}</dd>
         {% if company.notes %}<dt>Notas</dt><dd style="white-space:pre-wrap">{{ company.notes }}</dd>{% endif %}

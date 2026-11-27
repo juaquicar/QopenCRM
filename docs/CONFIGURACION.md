@@ -84,6 +84,34 @@ usa el asistente de cada persona con su propia cuenta. Ver [IA.md](IA.md).
 | Colores de la interfaz | Variables CSS al principio de `static/css/app.css`. |
 | Etapas, probabilidades, motivos de pérdida y roles | En el CRM: **Ajustes**. |
 
+## NDA
+
+Desde la ficha de un lead se genera un acuerdo marco de confidencialidad en PDF, en español o en inglés. Los datos del
+cliente salen de la empresa y del contacto; los de tu empresa, de estas variables. El texto se rige por la legislación
+española: revísalo con tu asesoría antes de usarlo (plantillas en `templates/sales/nda_es.html` y `nda_en.html`).
+
+| Variable | Por defecto | Para qué |
+|---|---|---|
+| `NDA_ISSUER_NAME` | `TU EMPRESA, S.L.` | Razón social de tu empresa. |
+| `NDA_ISSUER_TAX_ID` | `B00000000` | NIF. |
+| `NDA_ISSUER_ADDRESS` | de ejemplo | Domicilio social. |
+| `NDA_ISSUER_SIGNER` | de ejemplo | Persona que firma por tu empresa. |
+| `NDA_ISSUER_POSITION` | `Administrador único` | Cargo de quien firma. |
+| `NDA_ISSUER_COURTS` | `Madrid` | Ciudad de los juzgados a los que se someten las partes. |
+| `NDA_ISSUER_ADDRESS_EN`, `NDA_ISSUER_POSITION_EN`, `NDA_ISSUER_COURTS_EN` | las anteriores | Versión para el acuerdo en inglés. |
+
+## Precios desde Stripe (opcional)
+
+| Variable | Por defecto | Para qué |
+|---|---|---|
+| `STRIPE_SECRET_KEY` | vacío (desactivado) | Clave de Stripe. Basta una restringida con lectura de Products y Prices (`rk_live_…`). |
+
+Con la clave puesta, **Productos → Precios de Stripe** (o `./qopencrm.sh manage sync_stripe`, y una vez al día el
+proceso en segundo plano) trae al catálogo cada producto activo de Stripe con precio recurrente en euros: cuota base
+mensual y anual y, si el precio va por tramos, el precio por usuario de cada tramo. No duplica: casa por id de Stripe,
+luego por código (metadato `code` del producto en Stripe o su nombre en mayúsculas con guiones) y luego por nombre.
+Un nombre «Familia - Plan» coloca el producto en esa familia.
+
 ## Copias de seguridad
 
 | Variable | Por defecto | Para qué |

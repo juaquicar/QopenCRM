@@ -1,0 +1,198 @@
+{% extends "sales/nda_base.html" %}
+{% block title %}NDA {{ issuer.name }} - {{ nda.party_name }}{% endblock %}
+{% block running %}Acuerdo marco de confidencialidad · {{ issuer.name|escapejs }} · {{ nda.party_name|escapejs }}{% endblock %}
+{% block page %}Página{% endblock %}
+{% block tag %}Confidencial{% endblock %}
+{% block body %}
+<h1>Acuerdo marco de confidencialidad y no divulgación (NDA)</h1>
+
+<h2 class="part">Reunidos</h2>
+<div class="party">De una parte, <b>{{ issuer.name }}</b>, sociedad constituida conforme a la legislación española, con domicilio social en {{ issuer.address }} y número de identificación fiscal (NIF) {{ issuer.tax_id }}, representada por {{ issuer.signer }}, en calidad de {{ issuer.position }}.</div>
+<div class="party">Y de otra parte, <b>{{ nda.party_name }}</b>, sociedad{% if country %} constituida conforme a la legislación de {{ country }},{% endif %} con domicilio social en {{ nda.party_address }}{% if nda.party_tax_id %} y número de identificación fiscal {{ nda.party_tax_id }}{% endif %}{% if nda.signer_name %}, representada por {{ nda.signer_name }}{% if nda.signer_position %}, en calidad de {{ nda.signer_position }}{% endif %}{% endif %}.</div>
+<p>Cada una de ellas podrá ser denominada individualmente la «Parte» y, conjuntamente, las «Partes». Las Partes se reconocen mutuamente la capacidad legal necesaria para suscribir este acuerdo y obligarse por él.</p>
+
+<h2 class="part">Exponen</h2>
+<p><b>I.</b> Que las Partes mantienen o tienen intención de mantener conversaciones, negociaciones, estudios, intercambios de información, procesos de licitación, colaboraciones comerciales o técnicas, proyectos de ingeniería o cualquier otra oportunidad de negocio conjunta (la «Finalidad»).</p>
+<p><b>II.</b> Que, para el análisis y el desarrollo de la Finalidad, puede ser necesario intercambiar información confidencial de carácter técnico, comercial, financiero, jurídico, estratégico u operativo.</p>
+<p><b>III.</b> Que ambas Partes desean proteger adecuadamente dicha información y regular las condiciones en las que podrá utilizarse.</p>
+<p>En virtud de lo anterior, las Partes acuerdan suscribir el presente Acuerdo de Confidencialidad y No Divulgación (el «Acuerdo»), que se regirá por las siguientes</p>
+
+<h2 class="part">Cláusulas</h2>
+
+<h2>1. Definiciones</h2>
+<h3>1.1 Información Confidencial</h3>
+<p class="lead">Se entenderá por «Información Confidencial» cualquier información revelada por una Parte a la otra, con independencia del soporte utilizado y de que esté o no marcada como confidencial, incluyendo, sin carácter limitativo:</p>
+<ul>
+  <li>Planos, diseños, proyectos y documentos de ingeniería.</li>
+  <li>Estudios técnicos y documentación de red.</li>
+  <li>Información sobre despliegues FTTH, FTTx, móviles, de radio, de fibra óptica y de telecomunicaciones.</li>
+  <li>Bases de datos SIG y cartografía.</li>
+  <li>Software, algoritmos, aplicaciones y herramientas propias.</li>
+  <li>Metodologías de trabajo, procedimientos internos y <i>know-how</i>.</li>
+  <li>Procesos de tramitación de permisos y licencias.</li>
+  <li>Información financiera, económica, estratégica y comercial.</li>
+  <li>Tarifas, presupuestos, estimaciones y modelos de costes.</li>
+  <li>Información relativa a clientes, proveedores, socios y subcontratistas.</li>
+  <li>Secretos empresariales.</li>
+  <li>Información verbal revelada en reuniones, videoconferencias o presentaciones.</li>
+  <li>Cualquier copia, resumen, análisis o documento derivado de la información anterior.</li>
+</ul>
+<h3>1.2 Parte Reveladora</h3>
+<p>La Parte que revela Información Confidencial.</p>
+<h3>1.3 Parte Receptora</h3>
+<p>La Parte que recibe Información Confidencial.</p>
+<h3>1.4 Personal Autorizado</h3>
+<p>Administradores, directivos, empleados, asesores profesionales, auditores, abogados, consultores o Filiales que necesiten acceder a la Información Confidencial para cumplir la Finalidad y que estén sujetos a obligaciones de confidencialidad al menos tan estrictas como las de este Acuerdo.</p>
+<h3>1.5 Filiales</h3>
+<p>Sociedades que controlen a cualquiera de las Partes, estén controladas por ella o se encuentren bajo control común con ella.</p>
+
+<h2>2. Información excluida</h2>
+<p class="lead">2.1 No tendrá la consideración de Información Confidencial aquella respecto de la cual la Parte Receptora pueda acreditar que:</p>
+<ol>
+  <li>Era de dominio público en el momento de su revelación.</li>
+  <li>Pasó a ser de dominio público con posterioridad sin que mediara incumplimiento de este Acuerdo.</li>
+  <li>Era ya conocida por la Parte Receptora por medios lícitos.</li>
+  <li>Fue obtenida lícitamente de un tercero no sujeto a obligación de confidencialidad alguna.</li>
+  <li>Fue desarrollada de forma independiente por la Parte Receptora sin utilizar la Información Confidencial.</li>
+</ol>
+<p>2.2 Cuando la Parte Receptora esté obligada a revelar Información Confidencial por una norma legal o reglamentaria o por requerimiento de un juzgado o de una autoridad pública, podrá hacerlo únicamente en la medida estrictamente exigida y, siempre que la ley lo permita, previa notificación escrita a la Parte Reveladora para que esta pueda solicitar las medidas de protección que procedan.</p>
+
+<h2>3. Obligaciones de confidencialidad</h2>
+<p class="lead">La Parte Receptora se compromete a cumplir lo siguiente:</p>
+<h3>3.1 Uso limitado</h3>
+<p>Utilizar la Información Confidencial exclusivamente para la Finalidad.</p>
+<h3>3.2 No divulgación</h3>
+<p>No revelar la Información Confidencial a terceros sin la autorización previa y por escrito de la Parte Reveladora.</p>
+<h3>3.3 Protección</h3>
+<p>Aplicar un nivel de protección al menos equivalente al que aplica a su propia información sensible y, en todo caso, no inferior a un estándar razonable de diligencia profesional.</p>
+<h3>3.4 Acceso restringido</h3>
+<p>Permitir el acceso únicamente al Personal Autorizado que necesite conocer la información.</p>
+<h3>3.5 Prohibición de explotación comercial</h3>
+<p>No explotar comercialmente la Información Confidencial ni utilizarla para competir, directa o indirectamente, con la Parte Reveladora.</p>
+<h3>3.6 Copias</h3>
+<p>No realizar copias innecesarias ni reproducir la información más allá de lo estrictamente necesario para la Finalidad.</p>
+
+<h2>4. Incidentes de seguridad</h2>
+<p class="lead">La Parte Receptora notificará a la Parte Reveladora cualquiera de los siguientes hechos que afecte a la Información Confidencial:</p>
+<ul>
+  <li>Acceso no autorizado.</li>
+  <li>Pérdida o extravío de información.</li>
+  <li>Brecha de seguridad.</li>
+  <li>Robo de dispositivos.</li>
+  <li>Divulgación accidental.</li>
+</ul>
+<p>La notificación deberá realizarse en un plazo máximo de cuarenta y ocho (48) horas desde que se tenga conocimiento del incidente.</p>
+<p>Asimismo, la Parte Receptora adoptará de inmediato todas las medidas necesarias para minimizar el impacto e impedir nuevos accesos no autorizados.</p>
+
+<h2>5. Propiedad intelectual e industrial</h2>
+<p class="lead">Toda la Información Confidencial seguirá siendo propiedad exclusiva de la Parte Reveladora. La firma de este Acuerdo:</p>
+<ul>
+  <li>No implica cesión de derechos.</li>
+  <li>No concede licencia alguna.</li>
+  <li>No supone transmisión de propiedad intelectual o industrial.</li>
+  <li>No confiere derechos de explotación económica.</li>
+</ul>
+<p>Todos los derechos sobre patentes, software, diseños, documentación técnica, metodologías, bases de datos, <i>know-how</i>, marcas y cualesquiera otros activos intangibles seguirán perteneciendo en exclusiva a la Parte Reveladora.</p>
+
+<h2>6. Protección de datos</h2>
+<p class="lead">Las Partes cumplirán en todo momento:</p>
+<ul>
+  <li>El Reglamento (UE) 2016/679 (RGPD).</li>
+  <li>La Ley Orgánica 3/2018, de Protección de Datos Personales y garantía de los derechos digitales (LOPDGDD).</li>
+  <li>La demás normativa nacional e internacional de protección de datos que resulte aplicable.</li>
+</ul>
+<p class="lead">Cuando la Información Confidencial contenga datos personales:</p>
+<ol>
+  <li>Solo podrán utilizarse para la Finalidad.</li>
+  <li>No podrán comunicarse a terceros sin base legal para ello.</li>
+  <li>Se aplicarán las medidas técnicas y organizativas apropiadas para garantizar su seguridad.</li>
+  <li>Las transferencias internacionales deberán ajustarse a los mecanismos legalmente exigidos.</li>
+</ol>
+<p>Los datos personales de los firmantes y de las personas de contacto de cada Parte serán tratados por la otra con la única finalidad de gestionar este Acuerdo. Los interesados podrán ejercer sus derechos dirigiéndose por escrito al domicilio social de la Parte correspondiente.</p>
+
+<h2>7. Cumplimiento normativo y anticorrupción</h2>
+<p class="lead">Las Partes declaran y garantizan que:</p>
+<ul>
+  <li>Cumplen la normativa anticorrupción aplicable.</li>
+  <li>No incurrirán en sobornos ni en fraude.</li>
+  <li>No realizarán pagos indebidos a funcionarios públicos ni a particulares.</li>
+  <li>No están sujetas a sanciones internacionales que impidan el cumplimiento de este Acuerdo.</li>
+</ul>
+<p>El incumplimiento grave de esta cláusula facultará a la Parte cumplidora para resolver este Acuerdo con efecto inmediato.</p>
+
+<h2>8. Devolución y destrucción de la información</h2>
+<p class="lead">A petición de la Parte Reveladora, o una vez concluida la Finalidad, la Parte Receptora deberá:</p>
+<ul>
+  <li>Devolver toda la Información Confidencial.</li>
+  <li>Destruir todas las copias físicas y electrónicas.</li>
+  <li>Eliminar los archivos almacenados en sus propios sistemas.</li>
+</ul>
+<p>Todo ello en un plazo máximo de quince (15) días naturales. La Parte Reveladora podrá solicitar una certificación escrita que acredite dicha destrucción.</p>
+<p>No obstante, la Parte Receptora podrá conservar las copias que esté legalmente obligada a guardar y las contenidas en sus copias de seguridad ordinarias hasta su borrado habitual, que seguirán sujetas a este Acuerdo.</p>
+
+<h2>9. Responsabilidad</h2>
+<p>La Parte Receptora responderá de cualquier incumplimiento de este Acuerdo cometido por sus administradores, empleados, Filiales, asesores y subcontratistas autorizados.</p>
+<p class="lead">En caso de incumplimiento, la Parte incumplidora indemnizará íntegramente a la Parte perjudicada por los daños y perjuicios causados, incluidos:</p>
+<ul>
+  <li>El daño emergente.</li>
+  <li>El lucro cesante.</li>
+  <li>Los gastos jurídicos y los honorarios profesionales.</li>
+  <li>Las costas judiciales y los gastos extrajudiciales.</li>
+</ul>
+
+<h2>10. Medidas cautelares</h2>
+<p>Las Partes reconocen que el incumplimiento de las obligaciones de confidencialidad puede causar un perjuicio irreparable. En consecuencia, la Parte afectada podrá solicitar medidas cautelares, órdenes de cesación, el cumplimiento específico u otros remedios legales sin necesidad de acreditar que una indemnización económica resultaría insuficiente.</p>
+
+<h2>11. No exclusividad</h2>
+<p class="lead">Este Acuerdo no crea:</p>
+<ul>
+  <li>Una relación laboral.</li>
+  <li>Una relación de agencia.</li>
+  <li>Una empresa conjunta (<i>joint venture</i>) ni una sociedad.</li>
+  <li>Exclusividad.</li>
+  <li>Obligación de celebrar contratos futuros.</li>
+</ul>
+<p>Cada Parte podrá negociar libremente con terceros.</p>
+
+<h2>12. Duración</h2>
+<p>Este Acuerdo permanecerá en vigor durante cinco (5) años desde la fecha de su firma.</p>
+<p>Las obligaciones de confidencialidad se mantendrán durante diez (10) años desde la terminación del Acuerdo.</p>
+<p>En cuanto a los secretos empresariales, la obligación de confidencialidad se mantendrá mientras la información conserve esa condición conforme a la legislación aplicable.</p>
+
+<h2>13. Cesión</h2>
+<p>Ninguna de las Partes podrá ceder los derechos u obligaciones derivados de este Acuerdo sin el consentimiento previo y por escrito de la otra Parte.</p>
+
+<h2>14. Modificaciones</h2>
+<p>Cualquier modificación de este Acuerdo deberá constar por escrito y estar firmada por ambas Partes.</p>
+
+<h2>15. Nulidad parcial</h2>
+<p>La nulidad de cualquiera de sus estipulaciones no afectará a la validez del resto del Acuerdo, que seguirá plenamente en vigor.</p>
+
+<h2>16. Notificaciones</h2>
+<p class="lead">Todas las comunicaciones relativas a este Acuerdo deberán realizarse por escrito por cualquiera de los siguientes medios:</p>
+<ul>
+  <li>Correo electrónico corporativo.</li>
+  <li>Burofax.</li>
+  <li>Correo certificado.</li>
+  <li>Documento con firma electrónica reconocida.</li>
+</ul>
+<p>Se dirigirán a los domicilios sociales o a las direcciones de correo electrónico designadas por las Partes.</p>
+
+<h2>17. Acuerdo íntegro y firma</h2>
+<p>Este Acuerdo constituye el acuerdo íntegro entre las Partes sobre la confidencialidad de la información intercambiada para la Finalidad y sustituye a cualquier acuerdo anterior, escrito o verbal, sobre la misma materia.</p>
+<p>El Acuerdo podrá firmarse mediante firma electrónica y en ejemplares separados, que tendrán la misma validez que la firma manuscrita sobre un único documento.</p>
+
+<div class="closing">
+<h2>18. Ley aplicable y jurisdicción</h2>
+<p>Este Acuerdo se regirá e interpretará conforme a la legislación española.</p>
+<p>Las Partes, con renuncia expresa a cualquier otro fuero que pudiera corresponderles, se someten a los Juzgados y Tribunales de la ciudad de {{ issuer.courts }} (España) para la resolución de cualquier controversia derivada de este Acuerdo.</p>
+
+<div class="sign">
+  <p>Y en prueba de conformidad, las Partes firman este Acuerdo a {{ nda.signed_on|date:"j \d\e F \d\e Y" }}.</p>
+  <div class="signers">
+    <div><div class="box"></div><div class="who"><b>{{ issuer.name }}</b><br>{{ issuer.signer }}<br><span>{{ issuer.position }}</span></div></div>
+    <div><div class="box"></div><div class="who"><b>{{ nda.party_name }}</b><br>{% if nda.signer_name %}{{ nda.signer_name }}{% else %}<span>Nombre:</span>{% endif %}<br>{% if nda.signer_position %}<span>{{ nda.signer_position }}</span>{% elif not nda.signer_name %}<span>Cargo:</span>{% endif %}</div></div>
+  </div>
+</div>
+</div>
+{% endblock %}

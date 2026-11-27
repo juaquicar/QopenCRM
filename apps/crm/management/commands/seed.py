@@ -34,7 +34,7 @@ class Command(BaseCommand):
         for order, (code, name, view, edit, delete, export, catalog, pipeline) in enumerate(ROLES):
             Role.objects.get_or_create(code=code, defaults=dict(
                 name=name, order=order, view_scope=view, edit_scope=edit, can_delete=delete, can_export=export,
-                can_manage_catalog=catalog, can_manage_pipeline=pipeline, can_manage_events=code == "responsable-comercial",
+                can_manage_catalog=catalog, can_manage_pipeline=pipeline, can_manage_events=code in ("ceo", "director", "responsable-comercial"),
                 can_manage_knowledge=code in ("ceo", "director"), can_manage_incentives=code in ("ceo", "director", "responsable-comercial")))
         if not Stage.objects.exists():
             for order, (name, prob, color, won, lost) in enumerate(STAGES):
