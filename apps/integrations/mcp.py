@@ -21,7 +21,7 @@ from django.views.decorators.csrf import csrf_exempt
 from apps.accounts.models import AccessLog, User, log_access
 from apps.accounts.permissions import scope
 from apps.catalog.models import BillingModel, Product, ProductFamily
-from apps.crm import reports
+from apps.crm import history, mentions, reports
 from apps.crm.filters import OpportunityFilter, TaskFilter
 from apps.crm.models import Activity, Company, Contact, Event, LossReason, Opportunity, OpportunityLine, Stage, Task, normalize_name
 from apps.sales import services
@@ -198,6 +198,8 @@ def company_row(company):
 def contact_row(contact):
     return {"id": contact.pk, "name": contact.full_name, "position": contact.position, "email": contact.email, "phone": contact.phone,
             "mobile": contact.mobile, "company_id": contact.company_id, "company": contact.company.name if contact.company_id else None,
+            "other_companies": [{"id": c.pk, "name": c.name} for c in contact.other_companies.all()],
+            "emails": contact.values("email"), "phones": contact.values("phone"),
             "legal_basis": contact.get_legal_basis_display(), "erased": bool(contact.erased_at)}
 
 
@@ -212,7 +214,7 @@ def opportunity_row(opp):
 
 def task_row(task):
     return {"id": task.pk, "title": task.title, "kind": task.get_kind_display(), "due_at": when(task.due_at), "done": bool(task.done_at),
-            "assignee": str(task.assignee), "opportunity_id": task.opportunity_id, "company_id": task.company_id, "notes": task.notes}
+            "assignee": str(task.assignee), "also": [str(u) for u in task.assignees.all()], "opportunity_id": task.opportunity_id, "company_id": task.company_id, "notes": task.notes}
 
 
 def activity_row(activity):
@@ -307,7 +309,7 @@ def get_company(user, args):
         **company_row(company), "website": company.website, "email": company.email, "phone": company.phone, "sector": company.sector,
         "address": company.address, "province": company.province, "country": company.country, "notes": company.notes,
         "possible_duplicates": [company_row(c) for c in scope(company.duplicates(), user)[:5]],
-        "contacts": [contact_row(c) for c in company.contacts.select_related("company")[:30]],
+        "contacts": [contact_row(c) for c in Contact.objects.filter(Q(company=company) | Q(other_companies=company)).distinct().select_related("company")[:30]],
         "opportunities": [opportunity_row(o) for o in opps[:30]],
         "pending_tasks": [task_row(t) for t in scope(Task.objects.filter(company=company, done_at__isnull=True).select_related("assignee"), user)[:20]],
         "subscriptions": [{"id": s.pk, "plan": s.plan_name, "mrr": money(s.mrr), "status": s.get_status_display(),
@@ -322,11 +324,12 @@ def get_company(user, args):
 def search_contacts(user, args):
     found = scope(Contact.objects.select_related("company"), user)
     if args.get("company_id"):
-        found = found.filter(company_id=args["company_id"])
+        found = found.filter(Q(company_id=args["company_id"]) | Q(other_companies=args["company_id"]))
     for word in (args.get("q") or "").split():
         found = found.filter(Q(first_name__icontains=word) | Q(last_name__icontains=word) | Q(email__icontains=word)
-                             | Q(position__icontains=word) | Q(company__name__icontains=word))
-    return [contact_row(c) for c in found.order_by("first_name", "last_name")[:limit_of(args)]]
+                             | Q(position__icontains=word) | Q(company__name__icontains=word) | Q(other_companies__name__icontains=word)
+                             | Q(channels__value__icontains=word))
+    return [contact_row(c) for c in found.distinct().order_by("first_name", "last_name")[:limit_of(args)]]
 
 
 @tool("list_opportunities", "Oportunidades (leads) con filtros. Por defecto, las abiertas.", {
@@ -615,7 +618,7 @@ def _save_opportunity(user, opp, args):
     apply(opp, args, ("title", "source", "description"))
     if args.get("contact_id"):
         contact = fetch(Contact, user, args["contact_id"], "un contacto")
-        if contact.company_id and opp.company_id and contact.company_id != opp.company_id:
+        if contact.company_id and opp.company_id and not contact.works_at(opp.company):
             raise ToolError(f"{contact} es de otra empresa ({contact.company}).")
         opp.contact = contact
     if args.get("owner"):
@@ -651,6 +654,7 @@ def create_opportunity(user, args):
         raise ToolError("Una oportunidad nueva empieza en una etapa abierta. Para cerrarla usa move_opportunity.")
     opp = Opportunity(company=company, stage=stage, owner=user, probability=stage.probability)
     _save_opportunity(user, opp, args)
+    history.record(user, opp)
     emit("opportunity.created", {"id": opp.pk, "name": str(opp)})
     return {**opportunity_row(opp), "note": "Sin próxima acción todavía: créala con create_task."}
 
@@ -659,7 +663,9 @@ def create_opportunity(user, args):
       {"opportunity_id": I, **{k: v for k, v in OPP_PROPS.items() if k not in ("company_id", "company_name", "stage")}}, ["opportunity_id"], write=True)
 def update_opportunity(user, args):
     opp = editable(user, fetch(Opportunity, user, args["opportunity_id"], "una oportunidad"))
+    before = history.snapshot(opp)
     _save_opportunity(user, opp, args)
+    history.record(user, opp, before)
     emit("opportunity.updated", {"id": opp.pk, "name": str(opp)})
     return opportunity_row(opp)
 
@@ -769,22 +775,27 @@ def log_activity(user, args):
         company=company, opportunity=opp, contact=contact, user=user, kind=args["kind"], body=args["body"], subject=(args.get("subject") or "")[:250],
         direction=args.get("direction") or "", occurred_at=to_datetime(args["occurred_at"]) if args.get("occurred_at") else timezone.now(), source="mcp",
     )
+    mentions.notify(user, activity.body, activity=activity)
     return activity_row(activity)
 
 
 @tool("create_task", "Crea una tarea o recordatorio. Con opportunity_id pasa a ser la próxima acción de esa oportunidad.", {
     "title": desc(S, "Qué hay que hacer."), "due_at": desc(S, "ISO 8601, fecha, o: hoy, mañana, +3d, +2w."),
     "kind": desc(S, "Tipo.", enum=list(Task.Kind.values)), "assignee": desc(S, "Id, correo o nombre. Por defecto, la persona conectada."),
+    "also": desc({"type": "array", "items": S}, "Otras personas que comparten la acción (id, correo o nombre)."),
     "opportunity_id": I, "company_id": I, "notes": S,
 }, ["title", "due_at"], write=True)
 def create_task(user, args):
     opp = fetch(Opportunity, user, args["opportunity_id"], "una oportunidad") if args.get("opportunity_id") else None
     company = opp.company if opp else (fetch(Company, user, args["company_id"], "una empresa") if args.get("company_id") else None)
     assignee = find_user(args["assignee"], "persona asignada") if args.get("assignee") else user
-    if assignee != user and not user.edits_all and not (opp and user.can_edit(opp)):
+    also = [find_user(person, "persona asignada") for person in args.get("also") or []]
+    if any(u != user for u in [assignee, *also]) and not user.edits_all and not (opp and user.can_edit(opp)):
         raise ToolError("Tu rol solo puede crear tareas para otra persona en oportunidades tuyas.")
     task = Task.objects.create(title=args["title"][:200], due_at=to_datetime(args["due_at"], "fecha de la tarea"), kind=args.get("kind") or Task.Kind.TODO,
                                assignee=assignee, created_by=user, opportunity=opp, company=company, notes=args.get("notes") or "")
+    task.assignees.set([u for u in also if u != assignee])
+    mentions.notify(user, task.notes, task=task)
     return task_row(task)
 
 
@@ -803,7 +814,8 @@ def complete_task(user, args):
 
 
 @tool("reschedule_task", "Cambia la fecha, el texto o la persona de una tarea.",
-      {"task_id": I, "due_at": S, "title": S, "assignee": S, "notes": S}, ["task_id"], write=True)
+      {"task_id": I, "due_at": S, "title": S, "assignee": S, "notes": S,
+       "also": desc({"type": "array", "items": S}, "Otras personas que comparten la acción. Sustituye a las actuales.")}, ["task_id"], write=True)
 def reschedule_task(user, args):
     task = editable(user, fetch(Task, user, args["task_id"], "una tarea"))
     apply(task, args, ("title", "notes"))
@@ -812,6 +824,8 @@ def reschedule_task(user, args):
     if args.get("assignee"):
         task.assignee = find_user(args["assignee"], "persona asignada")
     task.save()
+    if args.get("also") is not None:
+        task.assignees.set([u for u in (find_user(person, "persona asignada") for person in args["also"]) if u != task.assignee])
     return task_row(task)
 
 

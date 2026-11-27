@@ -8,6 +8,6 @@
     <label><input type="radio" name="kind" value="email">Correo</label>
     <label><input type="radio" name="kind" value="meeting">Reunión</label>
   </div>
-  <textarea name="body" placeholder="¿Qué ha pasado? Escribe y pulsa Ctrl+Enter…" required aria-label="Detalle"></textarea>
+  <textarea name="body" placeholder="¿Qué ha pasado? Usa @ para avisar a alguien o @todos a los implicados. Ctrl+Enter para guardar…" data-mentions="{% url 'lookup' 'user' %}" required aria-label="Detalle"></textarea>
   <div class="bar2"><span class="muted small hide-m">Queda en el historial de la empresa</span><button class="btn sm">Registrar</button></div>
 </form>

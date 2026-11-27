@@ -2,13 +2,13 @@ from django.conf import settings
 from django.contrib.auth import login as auth_login
 from django.contrib.auth import logout as auth_logout
 from django.contrib.auth.decorators import login_not_required
-from django.core.mail import send_mail
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
+from .mailer import send_internal
 from .models import AccessLog, LoginCode, User, log_access
 
 
@@ -16,14 +16,11 @@ def _send_code(user):
     code = LoginCode.issue(user)
     if code is None:
         return
-    send_mail(
-        subject=f"{code} es tu código de acceso a QopenCRM",
-        message=(
-            f"Hola {user.name or ''},\n\nTu código de acceso es: {code}\n\n"
-            f"Caduca en {settings.LOGIN_CODE_TTL_MINUTES} minutos. Si no lo has pedido tú, ignora este correo."
-        ),
-        from_email=None,
-        recipient_list=[user.email],
+    send_internal(
+        f"{code} es tu código de acceso",
+        f"Hola {user.name or ''},\n\nTu código de acceso es: {code}\n\n"
+        f"Caduca en {settings.LOGIN_CODE_TTL_MINUTES} minutos. Si no lo has pedido tú, ignora este correo.",
+        user.email,
     )
 
 

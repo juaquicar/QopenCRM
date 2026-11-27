@@ -2,11 +2,22 @@
 <div class="tl k-{{ a.kind }}">
   <span class="dot">{% icon a.kind %}</span>
   <div>
-    <div class="head"><b>{{ a.get_kind_display }}{% if a.direction %} {{ a.get_direction_display|lower }}{% endif %}</b>{% if a.subject %}<span style="color:var(--fg)">{{ a.subject }}</span>{% endif %}
+    {% with m=a|meeting_info %}<div class="head"><b>{% if m %}Reunión de Teams{% else %}{{ a.get_kind_display }}{% if a.direction %} {{ a.get_direction_display|lower }}{% endif %}{% endif %}</b>{% if a.subject and not m %}<span style="color:var(--fg)">{{ a.subject }}</span>{% endif %}
       <span>{{ a.user|default:"Automático" }} · {{ a.occurred_at|due }}</span>
       {% if show_opp and a.opportunity %}<a class="link" href="{% url 'opportunity' a.opportunity_id %}">{{ a.opportunity }}</a>{% endif %}
       {% if show_company %}<a class="link" href="{% url 'company' a.company_id %}">{{ a.company }}</a>{% endif %}
       {% if a.contact %}<span>con {{ a.contact }}</span>{% endif %}</div>
-    {% if a.body %}<div class="body">{{ a.body }}</div>{% endif %}
+    {% if m %}<div class="meet{% if m.past %} past{% endif %}">
+      <div class="meet-title">{{ m.title }}</div>
+      <dl class="meet-info">
+        <dt>Cuándo</dt><dd>{{ m.when }}{% if m.length %} <span class="muted">· {{ m.length }}</span>{% endif %}{% if m.past %} <span class="chip">Pasada</span>{% endif %}</dd>
+        <dt>Asistentes</dt><dd>{% for person in m.attendees %}<a class="chip" href="mailto:{{ person }}">{{ person }}</a>{% endfor %}</dd>
+        <dt>Convoca</dt><dd>{{ m.account }}</dd>
+      </dl>
+      {% if m.message %}<div class="body">{{ m.message|mentions }}</div>{% endif %}
+      <div class="row"><a class="btn sm" href="{{ m.url }}" target="_blank" rel="noopener">{% icon "meeting" %}Unirse a la reunión</a>
+        <button type="button" class="btn ghost sm" data-copy="{{ m.url }}">Copiar enlace</button></div>
+    </div>
+    {% elif a.body %}<div class="body">{{ a.body|mentions }}</div>{% endif %}{% endwith %}
   </div>
 </div>

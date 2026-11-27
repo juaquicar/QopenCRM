@@ -15,6 +15,7 @@ from apps.accounts.permissions import scope
 from apps.catalog.models import Product, ProductFamily
 from apps.crm import reports
 from apps.crm.exporters import export_zip
+from apps.crm import mentions
 from apps.crm.filters import CompanyFilter, ContactFilter, OpportunityFilter, TaskFilter
 from apps.crm.models import Activity, Company, Contact, LossReason, Opportunity, OpportunityLine, Stage, Task
 from apps.sales import services
@@ -237,6 +238,10 @@ class ActivityViewSet(ScopedViewSet):
     filterset_fields = ["company", "opportunity", "contact", "kind", "user"]
     search_fields = ["subject", "body"]
 
+    def perform_create(self, serializer):
+        super().perform_create(serializer)
+        mentions.notify(self.request.user, serializer.instance.body, activity=serializer.instance)
+
 
 class TaskViewSet(ScopedViewSet):
     queryset = Task.objects.all()
@@ -250,6 +255,7 @@ class TaskViewSet(ScopedViewSet):
         if not serializer.validated_data.get("assignee"):
             serializer.validated_data["assignee"] = self.request.user
         super().perform_create(serializer)
+        mentions.notify(self.request.user, serializer.instance.notes, task=serializer.instance)
 
     @action(detail=True, methods=["post"])
     def complete(self, request, pk=None):

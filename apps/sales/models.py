@@ -265,3 +265,36 @@ class Quote(models.Model):
             if rows:
                 out.append({"key": key, "label": label, "lines": rows, "total": total, "suffix": suffix})
         return out
+
+
+class Nda(models.Model):
+    """Acuerdo de confidencialidad generado para el cliente de una oportunidad. Guarda la foto de los datos con los que se emitió."""
+
+    class Language(models.TextChoices):
+        ES = "es", "Español"
+        EN = "en", "Inglés"
+
+    opportunity = models.ForeignKey(Opportunity, on_delete=models.CASCADE, related_name="ndas")
+    language = models.CharField("idioma", max_length=2, choices=Language.choices, default=Language.ES)
+    party_name = models.CharField("razón social", max_length=200)
+    party_address = models.CharField("domicilio social", max_length=300)
+    party_tax_id = models.CharField("identificación fiscal", max_length=40, blank=True)
+    party_country = models.CharField("país de constitución", max_length=60, blank=True)
+    signer_name = models.CharField("firmante", max_length=200, blank=True)
+    signer_position = models.CharField("cargo del firmante", max_length=120, blank=True)
+    signed_on = models.DateField("fecha del acuerdo", default=timezone.localdate)
+    pdf = models.FileField(upload_to="nda/%Y/", blank=True)
+    created_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "NDA"
+        verbose_name_plural = "NDA"
+
+    def __str__(self):
+        return f"NDA {self.party_name} ({self.language.upper()})"
+
+    @property
+    def filename(self):
+        return f"NDA {self.party_name} ({self.language.upper()}).pdf".replace("/", "-")

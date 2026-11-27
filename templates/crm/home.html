@@ -4,22 +4,40 @@
 <div class="page-head">
   <div><span class="eyebrow">{{ now|date:"l j \d\e F" }}</span><h1 style="margin-top:8px">Hola, {{ user.first_name }}</h1>
     <p class="lede">{% if overdue or today %}Tienes {{ overdue|length|add:today.count }} cosa{{ overdue|length|add:today.count|pluralize }} para hoy.{% else %}Nada pendiente para hoy.{% endif %} {{ my_opps_count }} oportunidad{{ my_opps_count|pluralize:"es" }} abierta{{ my_opps_count|pluralize }} a tu cargo.</p></div>
-  <div class="row"><button class="btn ghost" data-modal="{% url 'modal_new' 'task' %}">{% icon "plus" %}Tarea</button><button class="btn" data-modal="{% url 'modal_new' 'opportunity' %}">{% icon "plus" %}Oportunidad</button></div>
+  <div class="row hide-m"><button class="btn ghost" data-modal="{% url 'modal_new' 'task' %}">{% icon "plus" %}Tarea</button><button class="btn" data-modal="{% url 'modal_new' 'opportunity' %}">{% icon "plus" %}Oportunidad</button></div>
+</div>
+<div class="tabs only-m" data-tabs>
+  <button type="button" class="on" data-tab="agenda">Agenda{% if overdue %}<span class="count">{{ overdue|length }}</span>{% endif %}</button>
+  <button type="button" data-tab="leads">Sin acción{% if no_action %}<span class="count warn">{{ no_action|length }}</span>{% endif %}</button>
+  <button type="button" data-tab="team">Actividad{% if nav_mentions %}<span class="count">{{ nav_mentions }}</span>{% endif %}</button>
 </div>
 <div class="grid cols-2">
-  <div class="stack">
+  <div class="stack on" data-pane="agenda">
     {% if overdue %}<section class="card" style="border-color:color-mix(in srgb,var(--bad) 45%,transparent)"><h2 style="color:var(--bad)">Vencidas · {{ overdue|length }}</h2>{% for t in overdue %}{% include "crm/_task.html" with show_context=1 %}{% endfor %}</section>{% endif %}
     <section class="card"><h2>Hoy</h2>{% for t in today %}{% include "crm/_task.html" with show_context=1 %}{% empty %}<div class="empty">Nada programado para hoy.</div>{% endfor %}</section>
     <section class="card"><h2>Próximos 7 días</h2>{% for t in upcoming %}{% include "crm/_task.html" with show_context=1 %}{% empty %}<div class="empty">Semana despejada.</div>{% endfor %}</section>
   </div>
   <div class="stack">
-    <section class="card"><div class="spread"><h2>Sin próxima acción</h2>{% if no_action %}<span class="chip warn">{{ no_action|length }}</span>{% endif %}</div>
+    {% if mentions %}<section class="card" data-pane="team"><div class="spread"><h2>Menciones</h2>{% if nav_mentions %}<span class="chip">{{ nav_mentions }} sin leer</span>{% endif %}</div>
+      {% for n in mentions %}{% include "crm/_mention.html" %}{% endfor %}
+      <a class="link small" href="{% url 'notifications' %}" style="display:inline-block;margin-top:8px">Ver todas</a>
+    </section>{% endif %}
+    <section class="card" data-pane="team"><div class="spread"><h2>Última actividad</h2>{% if user.leads_team %}<span class="muted small">Todo el equipo · etapas y cambios de leads</span>{% endif %}</div><div class="timeline">{% for a in recent %}{% include "crm/_activity.html" with show_company=1 %}{% empty %}<div class="empty">Aún no hay actividad registrada.</div>{% endfor %}</div></section>
+    <section class="card" data-pane="leads"><div class="spread"><h2>Sin próxima acción</h2>{% if no_action %}<span class="chip warn">{{ no_action|length }}</span>{% endif %}</div>
       <p class="muted small" style="margin-bottom:10px">Una oportunidad abierta sin siguiente paso se enfría. Ponle fecha.</p>
       {% for o in no_action %}<div class="task"><div class="grow"><a href="{% url 'opportunity' o.pk %}"><b>{{ o.title }}</b></a><div class="meta"><span>{{ o.company }}</span><span>{{ o.stage }}</span>{% if o.owner_id != user.pk and o.owner %}<span>{{ o.owner }}</span>{% endif %}</div></div><button class="next none" data-modal="{% url 'task_next' o.pk %}">+ Acción</button></div>
       {% empty %}<div class="empty">Todas las oportunidades abiertas tienen su próximo paso. Así se hace.</div>{% endfor %}
     </section>
-    <section class="card"><h2>Última actividad</h2><div class="timeline">{% for a in recent %}{% include "crm/_activity.html" with show_company=1 %}{% empty %}<div class="empty">Aún no hay actividad registrada.</div>{% endfor %}</div></section>
+    {% if user.is_management %}
+    <section class="card" data-pane="team"><div class="spread"><h2>Últimas empresas</h2><a class="link small" href="{% url 'companies' %}">Ver todas</a></div>
+      {% for c in new_companies %}<div class="task"><div class="grow"><a href="{% url 'company' c.pk %}"><b>{{ c.name }}</b></a><div class="meta"><span>{{ c.created_at|due }}</span>{% if c.owner %}<span>{{ c.owner }}</span>{% endif %}{% if c.city %}<span>{{ c.city }}</span>{% endif %}</div></div></div>
+      {% empty %}<div class="empty">Aún no hay empresas.</div>{% endfor %}
+    </section>
+    <section class="card" data-pane="team"><div class="spread"><h2>Últimos contactos</h2><a class="link small" href="{% url 'contacts' %}">Ver todos</a></div>
+      {% for c in new_contacts %}<div class="task"><div class="grow"><a href="{% url 'contact' c.pk %}"><b>{{ c.full_name }}</b></a>{% if c.position %} <span class="muted small">· {{ c.position }}</span>{% endif %}<div class="meta"><span>{{ c.created_at|due }}</span>{% if c.company %}<a class="link" href="{% url 'company' c.company_id %}">{{ c.company }}</a>{% endif %}{% if c.owner %}<span>{{ c.owner }}</span>{% endif %}</div></div></div>
+      {% empty %}<div class="empty">Aún no hay contactos.</div>{% endfor %}
+    </section>
+    {% endif %}
   </div>
 </div>
 {% endblock %}
-{% block fab %}<button class="fab" data-modal="{% url 'modal_new' 'opportunity' %}" aria-label="Nueva oportunidad">+</button>{% endblock %}

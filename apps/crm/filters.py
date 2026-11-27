@@ -83,7 +83,7 @@ class OpportunityFilter(df.FilterSet):
 class TaskFilter(df.FilterSet):
     when = df.ChoiceFilter(method="by_when", label="Cuándo",
                            choices=[("overdue", "Vencidas"), ("today", "Hoy"), ("week", "Próximos 7 días"), ("done", "Hechas")])
-    assignee = df.ModelChoiceFilter(queryset=User.objects.filter(is_active=True), label="Responsable")
+    assignee = df.ModelChoiceFilter(queryset=User.objects.filter(is_active=True), method="by_person", label="Responsable")
     kind = df.ChoiceFilter(choices=Task.Kind.choices, label="Tipo")
     opportunity = df.ModelChoiceFilter(queryset=Opportunity.objects.all())
     company = df.ModelChoiceFilter(queryset=Company.objects.all())
@@ -91,6 +91,9 @@ class TaskFilter(df.FilterSet):
     class Meta:
         model = Task
         fields = []
+
+    def by_person(self, queryset, name, value):
+        return queryset.filter(pk__in=Task.objects.filter(Task.for_user(value)).values("pk"))
 
     def by_when(self, queryset, name, value):
         start, end = _day_bounds()
@@ -123,7 +126,7 @@ class CompanyFilter(df.FilterSet):
 
 class ContactFilter(df.FilterSet):
     q = df.CharFilter(method="search", label="Buscar")
-    company = df.ModelChoiceFilter(queryset=Company.objects.all())
+    company = df.ModelChoiceFilter(queryset=Company.objects.all(), method="at_company")
 
     legal_basis = df.ChoiceFilter(choices=Contact.LegalBasis.choices, label="Base legal", empty_label="Cualquier base legal")
 
@@ -134,5 +137,9 @@ class ContactFilter(df.FilterSet):
     def search(self, queryset, name, value):
         return queryset.filter(
             Q(first_name__icontains=value) | Q(last_name__icontains=value) | Q(email__icontains=value)
-            | Q(company__name__icontains=value) | Q(position__icontains=value)
-        )
+            | Q(company__name__icontains=value) | Q(position__icontains=value) | Q(mobile__icontains=value) | Q(phone__icontains=value)
+            | Q(other_companies__name__icontains=value) | Q(channels__value__icontains=value)
+        ).distinct()
+
+    def at_company(self, queryset, name, value):
+        return queryset.filter(Q(company=value) | Q(other_companies=value)).distinct() if value else queryset

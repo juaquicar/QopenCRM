@@ -1,0 +1,198 @@
+{% extends "sales/nda_base.html" %}
+{% block title %}NDA {{ issuer.name }} - {{ nda.party_name }}{% endblock %}
+{% block running %}Framework NDA · {{ issuer.name|escapejs }} · {{ nda.party_name|escapejs }}{% endblock %}
+{% block page %}Page{% endblock %}
+{% block tag %}Confidential{% endblock %}
+{% block body %}
+<h1>Framework Confidentiality and Non-Disclosure Agreement (NDA)</h1>
+
+<h2 class="part">The Parties</h2>
+<div class="party">On the one hand, <b>{{ issuer.name }}</b>, a company incorporated under the laws of Spain, with its registered office at {{ issuer.address }} and tax identification number (NIF) {{ issuer.tax_id }}, represented by {{ issuer.signer }}, acting as {{ issuer.position }}.</div>
+<div class="party">And on the other hand, <b>{{ nda.party_name }}</b>, a company{% if country %} incorporated under the laws of {{ country }},{% endif %} with its registered office at {{ nda.party_address }}{% if nda.party_tax_id %} and tax identification number {{ nda.party_tax_id }}{% endif %}{% if nda.signer_name %}, represented by {{ nda.signer_name }}{% if nda.signer_position %}, acting as {{ nda.signer_position }}{% endif %}{% endif %}.</div>
+<p>Each may be referred to individually as the “Party” and collectively as the “Parties”. The Parties acknowledge each other's legal capacity to enter into this agreement and to be bound by it.</p>
+
+<h2 class="part">Whereas</h2>
+<p><b>I.</b> The Parties are conducting or intend to conduct discussions, negotiations, studies, exchanges of information, tendering processes, commercial or technical collaborations, engineering projects or any other joint business opportunity (the “Purpose”).</p>
+<p><b>II.</b> For the analysis and development of the Purpose, it may be necessary to exchange confidential information of a technical, commercial, financial, legal, strategic or operational nature.</p>
+<p><b>III.</b> Both Parties wish to protect such information adequately and to regulate the conditions under which it may be used.</p>
+<p>In view of the foregoing, the Parties agree to enter into this Confidentiality and Non-Disclosure Agreement (the “Agreement”), which shall be governed by the following</p>
+
+<h2 class="part">Clauses</h2>
+
+<h2>1. Definitions</h2>
+<h3>1.1 Confidential Information</h3>
+<p class="lead">“Confidential Information” shall mean any information disclosed by one Party to the other, regardless of the medium used and whether or not it is marked as confidential, including, without limitation:</p>
+<ul>
+  <li>Plans, designs, projects and engineering documents.</li>
+  <li>Technical studies and network documentation.</li>
+  <li>Information on FTTH, FTTx, mobile, radio, fibre-optic and telecommunications deployments.</li>
+  <li>GIS databases and cartography.</li>
+  <li>Software, algorithms, applications and proprietary tools.</li>
+  <li>Working methodologies, internal procedures and know-how.</li>
+  <li>Permit and licence application processes.</li>
+  <li>Financial, economic, strategic and commercial information.</li>
+  <li>Rates, quotations, estimates and cost models.</li>
+  <li>Information relating to customers, suppliers, partners and subcontractors.</li>
+  <li>Trade secrets.</li>
+  <li>Verbal information disclosed during meetings, video conferences or presentations.</li>
+  <li>Any copy, summary, analysis or document derived from the above information.</li>
+</ul>
+<h3>1.2 Disclosing Party</h3>
+<p>The Party that discloses Confidential Information.</p>
+<h3>1.3 Receiving Party</h3>
+<p>The Party that receives Confidential Information.</p>
+<h3>1.4 Authorised Personnel</h3>
+<p>Directors, senior managers, employees, professional advisers, auditors, lawyers, consultants or Affiliates who need access to Confidential Information in order to fulfil the Purpose and who are bound by confidentiality obligations at least as strict as those set out in this Agreement.</p>
+<h3>1.5 Affiliates</h3>
+<p>Companies which control, are controlled by, or are under common control with either of the Parties.</p>
+
+<h2>2. Excluded information</h2>
+<p class="lead">2.1 Information shall not be regarded as Confidential Information if the Receiving Party can show that it:</p>
+<ol>
+  <li>Was in the public domain at the time of its disclosure.</li>
+  <li>Subsequently entered the public domain without any breach of this Agreement.</li>
+  <li>Was already known to the Receiving Party through lawful means.</li>
+  <li>Was lawfully obtained from a third party not subject to any confidentiality obligation.</li>
+  <li>Was independently developed by the Receiving Party without using the Confidential Information.</li>
+</ol>
+<p>2.2 Where the Receiving Party is required to disclose Confidential Information by law, by regulation or by order of a court or public authority, it may do so only to the extent strictly required and, where legally permitted, after giving the Disclosing Party prior written notice so that it may seek appropriate protective measures.</p>
+
+<h2>3. Confidentiality obligations</h2>
+<p class="lead">The Receiving Party undertakes to comply with the following:</p>
+<h3>3.1 Limited use</h3>
+<p>To use the Confidential Information exclusively for the Purpose.</p>
+<h3>3.2 Non-disclosure</h3>
+<p>Not to disclose the Confidential Information to third parties without the prior written authorisation of the Disclosing Party.</p>
+<h3>3.3 Protection</h3>
+<p>To apply a level of protection at least equivalent to that applied to its own sensitive information and, in any event, no less than a reasonable standard of professional diligence.</p>
+<h3>3.4 Restricted access</h3>
+<p>To grant access only to Authorised Personnel who need to know the information.</p>
+<h3>3.5 Prohibition on commercial exploitation</h3>
+<p>Not to exploit the Confidential Information commercially or use it to compete, directly or indirectly, with the Disclosing Party.</p>
+<h3>3.6 Copies</h3>
+<p>Not to make unnecessary copies or reproduce the information beyond what is strictly required for the Purpose.</p>
+
+<h2>4. Security incidents</h2>
+<p class="lead">The Receiving Party shall notify the Disclosing Party of any of the following affecting the Confidential Information:</p>
+<ul>
+  <li>Unauthorised access.</li>
+  <li>Loss or misplacement of information.</li>
+  <li>Security breach.</li>
+  <li>Theft of devices.</li>
+  <li>Accidental disclosure.</li>
+</ul>
+<p>Notification must be made within forty-eight (48) hours of becoming aware of the incident.</p>
+<p>Furthermore, the Receiving Party shall immediately take all necessary measures to minimise the impact and prevent further unauthorised access.</p>
+
+<h2>5. Intellectual and industrial property</h2>
+<p class="lead">All Confidential Information shall remain the exclusive property of the Disclosing Party. The signing of this Agreement:</p>
+<ul>
+  <li>Does not imply any transfer of rights.</li>
+  <li>Does not grant any licence.</li>
+  <li>Does not entail any transfer of intellectual or industrial property.</li>
+  <li>Does not confer any right of economic exploitation.</li>
+</ul>
+<p>All rights to patents, software, designs, technical documentation, methodologies, databases, know-how, trade marks and any other intangible assets shall continue to belong exclusively to the Disclosing Party.</p>
+
+<h2>6. Data protection</h2>
+<p class="lead">The Parties shall at all times comply with:</p>
+<ul>
+  <li>Regulation (EU) 2016/679 (GDPR).</li>
+  <li>Spanish Organic Law 3/2018 on the Protection of Personal Data and the Guarantee of Digital Rights (LOPDGDD).</li>
+  <li>Any other applicable national and international data protection regulations.</li>
+</ul>
+<p class="lead">Where Confidential Information contains personal data:</p>
+<ol>
+  <li>It may only be used for the Purpose.</li>
+  <li>It may not be disclosed to third parties without a legal basis.</li>
+  <li>Appropriate technical and organisational measures shall be implemented to ensure its security.</li>
+  <li>International transfers must comply with the legally required mechanisms.</li>
+</ol>
+<p>The personal data of the signatories and contact persons of each Party shall be processed by the other Party for the sole purpose of managing this Agreement. Data subjects may exercise their rights by writing to the registered office of the relevant Party.</p>
+
+<h2>7. Regulatory compliance and anti-corruption</h2>
+<p class="lead">The Parties declare and warrant that:</p>
+<ul>
+  <li>They comply with the applicable anti-corruption regulations.</li>
+  <li>They shall not engage in bribery or fraud.</li>
+  <li>They shall not make improper payments to public officials or private individuals.</li>
+  <li>They are not subject to any international sanctions that would prevent the performance of this Agreement.</li>
+</ul>
+<p>Any serious breach of this clause shall entitle the non-breaching Party to terminate this Agreement with immediate effect.</p>
+
+<h2>8. Return and destruction of information</h2>
+<p class="lead">At the request of the Disclosing Party, or upon completion of the Purpose, the Receiving Party shall:</p>
+<ul>
+  <li>Return all Confidential Information.</li>
+  <li>Destroy all physical and electronic copies.</li>
+  <li>Delete the files stored on its own systems.</li>
+</ul>
+<p>This must be carried out within a maximum of fifteen (15) calendar days. The Disclosing Party may request written certification confirming such destruction.</p>
+<p>The Receiving Party may nevertheless retain the copies it is legally required to keep, and those held in routine backups until their ordinary deletion, which shall remain subject to this Agreement.</p>
+
+<h2>9. Liability</h2>
+<p>The Receiving Party shall be liable for any breach of this Agreement committed by its directors, employees, Affiliates, advisers and authorised subcontractors.</p>
+<p class="lead">In the event of a breach, the breaching Party shall fully compensate the aggrieved Party for the harm caused, including:</p>
+<ul>
+  <li>Direct damages.</li>
+  <li>Loss of profit.</li>
+  <li>Legal costs and professional fees.</li>
+  <li>Court and out-of-court costs.</li>
+</ul>
+
+<h2>10. Interim measures</h2>
+<p>The Parties acknowledge that a breach of the confidentiality obligations may cause irreparable harm. Consequently, the affected Party may seek interim measures, injunctions, specific performance or other legal remedies without having to prove that financial compensation would be insufficient.</p>
+
+<h2>11. Non-exclusivity</h2>
+<p class="lead">This Agreement does not create:</p>
+<ul>
+  <li>An employment relationship.</li>
+  <li>An agency relationship.</li>
+  <li>A joint venture or partnership.</li>
+  <li>Exclusivity.</li>
+  <li>An obligation to enter into future contracts.</li>
+</ul>
+<p>Each Party may negotiate freely with third parties.</p>
+
+<h2>12. Term</h2>
+<p>This Agreement shall remain in force for five (5) years from the date of its signing.</p>
+<p>The confidentiality obligations shall remain in force for ten (10) years from the termination of the Agreement.</p>
+<p>With regard to trade secrets, the confidentiality obligation shall remain in force for as long as the information retains that status in accordance with the applicable legislation.</p>
+
+<h2>13. Assignment</h2>
+<p>Neither Party may assign the rights or obligations arising from this Agreement without the prior written consent of the other Party.</p>
+
+<h2>14. Amendments</h2>
+<p>Any amendment to this Agreement must be made in writing and signed by both Parties.</p>
+
+<h2>15. Partial invalidity</h2>
+<p>The invalidity of any provision shall not affect the validity of the remainder of the Agreement, which shall remain in full force and effect.</p>
+
+<h2>16. Notices</h2>
+<p class="lead">All communications relating to this Agreement must be made in writing by any of the following means:</p>
+<ul>
+  <li>Corporate email.</li>
+  <li>Burofax.</li>
+  <li>Registered post.</li>
+  <li>A document bearing a recognised electronic signature.</li>
+</ul>
+<p>They shall be sent to the registered offices or to the email addresses designated by the Parties.</p>
+
+<h2>17. Entire agreement and signature</h2>
+<p>This Agreement constitutes the entire agreement between the Parties regarding the confidentiality of the information exchanged for the Purpose and supersedes any prior agreement, written or verbal, on the same subject matter.</p>
+<p>The Agreement may be signed by electronic signature and in counterparts, each of which shall have the same validity as a handwritten signature on a single document.</p>
+
+<div class="closing">
+<h2>18. Governing law and jurisdiction</h2>
+<p>This Agreement shall be governed by and construed in accordance with the laws of Spain.</p>
+<p>The Parties, expressly waiving any other jurisdiction to which they might be entitled, submit to the Courts and Tribunals of the city of {{ issuer.courts }} (Spain) for the resolution of any dispute arising from this Agreement.</p>
+
+<div class="sign">
+  <p>In witness whereof, the Parties sign this Agreement on {{ nda.signed_on|date:"j F Y" }}.</p>
+  <div class="signers">
+    <div><div class="box"></div><div class="who"><b>{{ issuer.name }}</b><br>{{ issuer.signer }}<br><span>{{ issuer.position }}</span></div></div>
+    <div><div class="box"></div><div class="who"><b>{{ nda.party_name }}</b><br>{% if nda.signer_name %}{{ nda.signer_name }}{% else %}<span>Name:</span>{% endif %}<br>{% if nda.signer_position %}<span>{{ nda.signer_position }}</span>{% elif not nda.signer_name %}<span>Position:</span>{% endif %}</div></div>
+  </div>
+</div>
+</div>
+{% endblock %}

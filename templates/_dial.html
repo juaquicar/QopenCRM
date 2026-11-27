@@ -1,0 +1,10 @@
+{% load crm %}{# Botón flotante de alta: un toque despliega qué crear. «company» y «contact» llegan ya puestos desde una ficha. #}
+<div class="dial" id="dial">
+  <div class="dial-items">
+    <button type="button" data-modal="{% url 'modal_new' 'task' %}{% if company %}?company={{ company.pk }}{% endif %}"><span>Tarea</span><i>{% icon "check" %}</i></button>
+    {% if not company %}<button type="button" data-modal="{% url 'modal_new' 'company' %}"><span>Empresa</span><i>{% icon "building" %}</i></button>{% endif %}
+    {% if not contact %}<button type="button" data-modal="{% url 'modal_new' 'contact' %}{% if company %}?company={{ company.pk }}{% endif %}"><span>Contacto</span><i>{% icon "person" %}</i></button>{% endif %}
+    <button type="button" data-modal="{% url 'modal_new' 'opportunity' %}{% if company %}?company={{ company.pk }}{% if contact %}&contact={{ contact.pk }}{% endif %}{% endif %}"><span>Lead</span><i>{% icon "board" %}</i></button>
+  </div>
+  <button type="button" class="fab" data-dial aria-label="Crear" aria-expanded="false">{% icon "plus" %}</button>
+</div>

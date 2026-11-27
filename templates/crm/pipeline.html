@@ -1,8 +1,10 @@
 {% extends "base.html" %}{% load crm %}
-{% block title %}Pipeline · QopenCRM{% endblock %}
+{% block title %}Leads · QopenCRM{% endblock %}
+{% block body_class %}{% if view != 'list' %}fit{% endif %}{% endblock %}
+{% block bar_actions %}{% if view == 'list' %}<a class="bar-btn" href="{% qs view='' %}" aria-label="Ver por etapas">{% icon "board" %}</a>{% else %}<a class="bar-btn" href="{% qs view='list' %}" aria-label="Ver en lista">{% icon "list" %}</a>{% endif %}{% endblock %}
 {% block content %}
-<div class="page-head">
-  <div><span class="eyebrow">Oportunidades</span><h1 style="margin-top:8px">Pipeline</h1></div>
+<div class="page-head hide-m">
+  <div><span class="eyebrow">Oportunidades</span><h1 style="margin-top:8px">Leads</h1></div>
   <div class="row">
     {% if n_hold or hold %}<div class="seg" role="group" aria-label="Paradas por el cliente" title="Oportunidades a la espera del cliente: {{ n_hold }}">
       <a href="{% qs hold='' %}" class="{% if not hold %}on{% endif %}">Con paradas</a><a href="{% qs hold='hide' %}" class="{% if hold == 'hide' %}on{% endif %}">Sin paradas</a><a href="{% qs hold='only' %}" class="{% if hold == 'only' %}on{% endif %}">Solo paradas · {{ n_hold }}</a></div>{% endif %}
@@ -12,7 +14,10 @@
 </div>
 <form class="filters" hx-get="{% url 'pipeline' %}" hx-target="#board" hx-swap="outerHTML" hx-push-url="true" hx-trigger="change, input changed delay:300ms from:input[name=q]">
   {% if view == "list" %}<input type="hidden" name="view" value="list">{% endif %}{% if hold %}<input type="hidden" name="hold" value="{{ hold }}">{% endif %}
-  <div class="search"><input type="search" name="q" value="{{ filter.form.q.value|default:'' }}" placeholder="Buscar oportunidad o empresa…" aria-label="Buscar"></div>
+  <div class="search"><input type="search" name="q" value="{{ filter.form.q.value|default:'' }}" placeholder="Buscar oportunidad o empresa…" aria-label="Buscar" enterkeyhint="search"></div>
+  <button type="button" class="iconbtn only-m{% if active_filters or hold %} active{% endif %}" data-filters aria-label="Filtros" aria-expanded="false">{% icon "filter" %}</button>
+  <div class="filter-panel">
+  {% if n_hold or hold %}<div class="seg only-m" role="group" aria-label="Paradas por el cliente"><a href="{% qs hold='' %}" class="{% if not hold %}on{% endif %}">Con paradas</a><a href="{% qs hold='hide' %}" class="{% if hold == 'hide' %}on{% endif %}">Sin paradas</a><a href="{% qs hold='only' %}" class="{% if hold == 'only' %}on{% endif %}">Solo paradas · {{ n_hold }}</a></div>{% endif %}
   {{ filter.form.status }}
   {{ filter.form.assignee }}
   {{ filter.form.action }}
@@ -31,9 +36,9 @@
     </div>
   </details>
   {% if active_filters %}<a class="link small" href="{% url 'pipeline' %}{% if view == 'list' %}?view=list{% endif %}">Quitar filtros</a>{% endif %}
+  </div>
 </form>
-{% if ai_enabled %}<form class="filters" method="post" action="{% url 'ai_search' %}" style="margin-top:-6px">{% csrf_token %}
+{% if ai_enabled %}<form class="filters hide-m" method="post" action="{% url 'ai_search' %}" style="margin-top:-6px">{% csrf_token %}
   <div class="search" style="max-width:520px"><input name="question" placeholder="✦ Pídelo con tus palabras: «lo de Plan Pro sin próxima acción de Ana»" aria-label="Buscar con IA"></div><button class="btn ghost sm">Buscar con IA</button></form>{% endif %}
 {% include "crm/_board.html" %}
 {% endblock %}
-{% block fab %}<button class="fab" data-modal="{% url 'modal_new' 'opportunity' %}" aria-label="Nueva oportunidad">+</button>{% endblock %}

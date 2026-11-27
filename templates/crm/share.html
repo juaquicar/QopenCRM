@@ -1,0 +1,14 @@
+{% extends "base.html" %}{% load crm %}
+{% block title %}Compartido · QopenCRM{% endblock %}
+{% block content %}
+<div class="page-head"><div><span class="eyebrow">Desde otra app</span><h1 style="margin-top:8px">¿Qué hago con esto?</h1>
+  <p class="lede">{% if ai_enabled %}Elige qué crear: la ficha se abre con este texto listo para que la IA rellene los campos.{% else %}Elige qué crear: el texto va a las notas de la ficha.{% endif %}</p></div></div>
+<section class="card stack">
+  <textarea id="share-text" rows="8" aria-label="Texto compartido" placeholder="Pega aquí una firma de correo, una tarjeta o un párrafo de una web…">{{ text }}</textarea>
+  <div class="row">
+    <button type="button" class="btn" data-share data-modal="{% url 'modal_new' 'contact' %}">{% icon "person" %}Contacto</button>
+    <button type="button" class="btn ghost" data-share data-modal="{% url 'modal_new' 'company' %}">{% icon "building" %}Empresa</button>
+    <button type="button" class="btn ghost" data-share data-modal="{% url 'modal_new' 'opportunity' %}">{% icon "board" %}Lead</button>
+  </div>
+</section>
+{% endblock %}

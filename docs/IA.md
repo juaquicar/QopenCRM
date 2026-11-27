@@ -98,7 +98,7 @@ Cualquier otro cliente MCP con transporte HTTP:
 | `add_line` | modifica | Añade una línea a una oportunidad: un producto del catálogo (product = su código) o una línea libre con su billing_model (monthly = recurrente, hourly = por horas, one_off = pago único), descripción y precio. |
 | `remove_line` | confirma antes | Quita una línea de una oportunidad. |
 | `log_activity` | modifica | Anota en el historial algo que ha pasado con un cliente: nota, llamada, correo o reunión. |
-| `create_task` | modifica | Crea una tarea o recordatorio. |
+| `create_task` | modifica | Crea una tarea o recordatorio, para una persona o compartida con varias (`also`). |
 | `complete_task` | modifica | Marca una tarea como hecha. |
 | `reschedule_task` | modifica | Cambia la fecha, el texto o la persona de una tarea. |
 | `create_quote` | modifica | Genera un presupuesto en PDF para una oportunidad. |
@@ -125,6 +125,7 @@ AI_MODEL=                    # vacío = modelo por defecto del proveedor
 | Función | Dónde | Qué hace |
 |---|---|---|
 | **Rellenar con IA** | Formularios de empresa y de contacto | Pegas una firma de correo, una tarjeta o un párrafo de una web y rellena los campos. Solo usa lo que aparece en el texto. |
+| **Buscar en internet** | Formularios de empresa y de contacto | Con lo ya escrito (nombre, web…) busca datos públicos con la herramienta de búsqueda web del proveedor y propone los campos, citando la fuente. Las notas internas no se envían. |
 | **Buscar con IA** | Pipeline | Escribes «lo de Plan Pro sin próxima acción de Ana» o «propuestas que cierran este mes» y se aplican los filtros. |
 
 Sin `AI_API_KEY` estas funciones no aparecen y el resto del CRM funciona igual.

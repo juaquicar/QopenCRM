@@ -7,8 +7,9 @@
       <span class="{% if t.is_overdue %}late{% endif %}">{{ t.due_at|due }}</span>
       {% if t.kind != "todo" %}<span>{{ t.get_kind_display }}</span>{% endif %}
       {% if show_context %}{% if t.opportunity %}<a class="link" href="{% url 'opportunity' t.opportunity_id %}">{{ t.opportunity }}</a>{% elif t.company %}<a class="link" href="{% url 'company' t.company_id %}">{{ t.company }}</a>{% endif %}{% endif %}
-      {% if t.assignee_id != user.pk %}<span>{{ t.assignee }}</span>{% endif %}
+      {% with people=t.people %}{% if people|length > 1 %}<span title="Compartida">{% for p in people %}{% if p.pk == user.pk %}Tú{% else %}{{ p }}{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}</span>{% elif t.assignee_id != user.pk %}<span>{{ t.assignee }}</span>{% endif %}{% endwith %}
     </div>
   </div>
+  {% with link=t|teams_link %}{% if link and not t.done_at %}<a class="btn ghost sm" href="{{ link }}" target="_blank" rel="noopener">Unirse</a>{% endif %}{% endwith %}
   <button class="iconbtn" style="width:28px;height:28px;border:0" data-modal="{% url 'modal_edit' 'task' t.pk %}" aria-label="Editar tarea">{% icon "edit" %}</button>
 </div>

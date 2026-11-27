@@ -1,4 +1,6 @@
 """Formularios de la web. Cada uno se abre en un diálogo (ver views.modal_form)."""
+import re
+
 from django import forms
 from django.utils import timezone
 
@@ -6,7 +8,7 @@ from apps.accounts.models import Role, User
 from apps.accounts.permissions import scope
 from apps.catalog.models import Product, ProductFamily
 from apps.integrations.models import Webhook
-from apps.sales.models import HourBank, HourEntry, QuoteTemplate, Subscription
+from apps.sales.models import HourBank, HourEntry, Nda, QuoteTemplate, Subscription
 
 from .models import Activity, Company, Contact, Event, LossReason, Opportunity, OpportunityLine, Stage, Task, normalize_name
 
@@ -32,6 +34,35 @@ class ComboWidget(forms.Widget):
             (attrs or {}).get("id", f"id_{name}"), str(current) if current else "", self.placeholder)
 
 
+class MultiComboWidget(forms.Widget):
+    """Varias empresas con buscador: cada una elegida queda como una etiqueta con su ✕."""
+
+    def __init__(self, kind, queryset, placeholder="Escribe para añadir otra empresa…"):
+        super().__init__()
+        self.kind, self.queryset, self.placeholder = kind, queryset, placeholder
+
+    def value_from_datadict(self, data, files, name):
+        return data.getlist(name) if hasattr(data, "getlist") else data.get(name, [])
+
+    def render(self, name, value, attrs=None, renderer=None):
+        from django.urls import reverse
+        from django.utils.html import format_html, format_html_join
+
+        ids = [str(v.pk if hasattr(v, "pk") else v) for v in (value or []) if str(getattr(v, "pk", v)).isdigit()]
+        chosen = self.queryset.model.objects.filter(pk__in=ids) if ids else []
+        chips = format_html_join("", '<span class="chip-pick">{}<input type="hidden" name="{}" value="{}"><button type="button" aria-label="Quitar">✕</button></span>',
+                                 ((str(c), name, c.pk) for c in chosen))
+        return format_html(
+            '<div class="combo multi" data-combo data-multi="{}" data-url="{}"><div class="chips">{}</div>'
+            '<input type="hidden" value=""><input type="text" class="combo-input" id="{}" placeholder="{}" autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list">'
+            '<ul class="combo-list" role="listbox" hidden></ul></div>',
+            name, reverse("lookup", args=[self.kind]), chips, (attrs or {}).get("id", f"id_{name}"), self.placeholder)
+
+
+def _lines(text):
+    return [line.strip(" ,;") for line in (text or "").replace(",", "\n").replace(";", "\n").splitlines() if line.strip(" ,;")]
+
+
 class BaseForm(forms.ModelForm):
     """Recibe el usuario para acotar los desplegables a lo que puede ver."""
 
@@ -52,6 +83,7 @@ class BaseForm(forms.ModelForm):
                 field.empty_label = "—"
             if isinstance(field.widget, forms.Textarea):
                 field.widget.attrs["rows"] = 3
+            _mobile_keyboard(name, field)
             if isinstance(field, forms.DateTimeField):
                 field.widget = forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M")
                 field.input_formats = ["%Y-%m-%dT%H:%M", "%Y-%m-%dT%H:%M:%S"]
@@ -59,8 +91,40 @@ class BaseForm(forms.ModelForm):
                 field.widget = forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")
 
 
+def _mobile_keyboard(name, field):
+    """En el móvil, cada campo abre su teclado: numérico para teléfonos, mayúscula inicial en los nombres."""
+    if isinstance(field.widget, forms.Textarea):
+        return
+    if name.endswith(("phone", "mobile")):
+        field.widget.attrs.update({"inputmode": "tel", "autocomplete": "off"})
+    elif name.endswith(("first_name", "last_name")) or name == "name":
+        field.widget.attrs.update({"autocapitalize": "words", "autocomplete": "off"})
+    elif name.endswith("website"):
+        field.widget.attrs.update({"inputmode": "url", "autocapitalize": "none"})
+
+
+def _insert_after(form, anchor, new_fields):
+    """Coloca campos añadidos en __init__ justo detrás de otro (los de la empresa o el contacto nuevo, juntos)."""
+    items = [(k, v) for k, v in form.fields.items() if k not in new_fields]
+    at = [k for k, _ in items].index(anchor) + 1
+    form.fields = dict(items[:at] + list(new_fields.items()) + items[at:])
+
+
+def _model_field(model, name, prefix):
+    field = model._meta.get_field(name).formfield()
+    field.required = False
+    field.label = str(field.label)[:1].upper() + str(field.label)[1:]
+    if isinstance(field.widget, forms.Textarea):
+        field.widget.attrs["rows"] = 2
+    _mobile_keyboard(name, field)
+    return f"{prefix}{name}", field
+
+
 class NewCompanyMixin(forms.Form):
-    """Empresa nueva desde el propio diálogo: el buscador ofrece «＋ Crear empresa» y se da de alta al guardar."""
+    """Empresa nueva desde el propio diálogo: el buscador ofrece «＋ Crear empresa» y se da de alta al guardar,
+    con sus datos principales (los mismos que en la ficha de empresa)."""
+
+    COMPANY_FIELDS = ["kind", "tax_id", "sector", "website", "email", "phone", "address", "city", "province", "country"]
 
     new_company = forms.CharField(required=False, max_length=200, widget=forms.HiddenInput)
     new_company_event = forms.ModelChoiceField(label="Conocida en (feria o evento)", queryset=Event.objects.all(), required=False,
@@ -68,20 +132,35 @@ class NewCompanyMixin(forms.Form):
 
     def setup_new_company(self):
         self.fields["company"].widget.create = "new_company"
+        _insert_after(self, "new_company", dict(_model_field(Company, name, "new_company_") for name in self.COMPANY_FIELDS))
+        self.fields["new_company_event"].empty_label = "—"
 
     def clean_new_company(self):
         return (self.cleaned_data.get("new_company") or "").strip()
 
     def resolve_company(self):
-        """La empresa elegida o, si se escribió una nueva, la recién creada (o la que ya había con ese nombre)."""
+        """La empresa elegida o, si se escribió una nueva, la recién creada (o la que ya había con ese nombre o CIF)."""
         data = self.cleaned_data
         if data.get("company") or not data.get("new_company"):
             return data.get("company")
+        values = {name: data.get(f"new_company_{name}") for name in self.COMPANY_FIELDS}
+        values = {k: v for k, v in values.items() if v not in (None, "")}
+        values["event"] = data.get("new_company_event")
         key = normalize_name(data["new_company"])
-        # misma empresa escrita otra vez: se usa la que ya hay, no se duplica
-        existing = scope(Company.objects.all(), self.user).filter(name_key=key).first() if key else None
-        company = existing or Company.objects.create(name=data["new_company"], owner=self.user, event=data.get("new_company_event"))
-        self.created_company = None if existing else company
+        tax_id = re.sub(r"[\s.\-]", "", values.get("tax_id", "")).upper()
+        # misma empresa escrita otra vez (nombre o CIF): se usa la que ya hay, no se duplica, y se completa lo que le falte
+        visible = scope(Company.objects.all(), self.user)
+        existing = (visible.filter(name_key=key).first() if key else None) or (visible.filter(tax_id=tax_id).first() if tax_id else None)
+        if existing:
+            missing = [k for k, v in values.items() if v and not getattr(existing, k) and k != "kind"]
+            for k in missing:
+                setattr(existing, k, values[k])
+            if missing:
+                existing.save()
+            self.created_company = None
+            return existing
+        company = Company.objects.create(name=data["new_company"], owner=self.user, **values)
+        self.created_company = company
         return company
 
 
@@ -104,19 +183,60 @@ class EventForm(BaseForm):
 
 
 class ContactForm(NewCompanyMixin, BaseForm):
-    """Alta de contacto: su empresa se busca o se crea ahí mismo, igual que al dar de alta una oportunidad."""
+    """Alta de contacto: su empresa se busca o se crea ahí mismo, igual que al dar de alta una oportunidad.
+    Puede ser de varias empresas y tener varios correos y teléfonos."""
+
+    extra_emails = forms.CharField(label="Otros correos", required=False, widget=forms.Textarea(attrs={"rows": 2}),
+                                   help_text="Uno por línea. El correo de arriba es el principal.")
+    extra_phones = forms.CharField(label="Otros teléfonos", required=False, widget=forms.Textarea(attrs={"rows": 2}),
+                                   help_text="Uno por línea, con una nota si quieres: «91 000 00 00 centralita».")
 
     class Meta:
         model = Contact
-        fields = ["first_name", "last_name", "company", "position", "email", "phone", "mobile", "is_primary", "owner",
-                  "legal_basis", "consent_marketing", "consent_source", "notes"]
+        fields = ["first_name", "last_name", "company", "other_companies", "position", "email", "extra_emails", "mobile", "phone", "extra_phones",
+                  "is_primary", "owner", "legal_basis", "consent_marketing", "consent_source", "notes"]
 
-    field_order = ["first_name", "last_name", "company", "new_company", "new_company_event"]
+    field_order = ["first_name", "last_name", "company", "new_company", "new_company_event", "other_companies", "position",
+                   "email", "extra_emails", "mobile", "phone", "extra_phones"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.setup_new_company()
+        self.fields["company"].label = "Empresa principal"
         self.fields["company"].help_text = "Si aún no está, escribe su nombre y créala aquí."
+        self.fields["other_companies"].widget = MultiComboWidget("company", self.fields["other_companies"].queryset)
+        self.fields["other_companies"].help_text = "Si también trabaja con otras empresas: aparecerá en la ficha de cada una."
+        self.fields["email"].label, self.fields["mobile"].label, self.fields["phone"].label = "Correo principal", "Móvil", "Teléfono"
+        if self.instance.pk:
+            self.fields["extra_emails"].initial = "\n".join(self.instance.values("email")[1 if self.instance.email else 0:])
+            phones = [p for p in self.instance.values("phone") if p not in (self.instance.mobile, self.instance.phone)]
+            self.fields["extra_phones"].initial = "\n".join(phones)
+
+    def clean_extra_emails(self):
+        emails = [e.lower() for e in _lines(self.cleaned_data.get("extra_emails"))]
+        bad = []
+        for e in emails:
+            try:
+                forms.EmailField().clean(e)
+            except forms.ValidationError:
+                bad.append(e)
+        if bad:
+            raise forms.ValidationError(f"No parece un correo: {', '.join(bad)}")
+        return emails
+
+    def clean_extra_phones(self):
+        return [line.strip() for line in (self.cleaned_data.get("extra_phones") or "").splitlines() if line.strip()]
+
+    def clean(self):
+        data = super().clean()
+        if data.get("company") and data.get("other_companies"):
+            data["other_companies"] = [c for c in data["other_companies"] if c.pk != data["company"].pk]
+        return data
+
+    def _save_m2m(self):
+        super()._save_m2m()
+        self.instance.set_channels("email", self.cleaned_data.get("extra_emails") or [])
+        self.instance.set_channels("phone", self.cleaned_data.get("extra_phones") or [])
 
     def save(self, commit=True):
         if "consent_marketing" in self.changed_data and self.instance.consent_marketing:
@@ -128,17 +248,14 @@ class ContactForm(NewCompanyMixin, BaseForm):
 class OpportunityForm(NewCompanyMixin, BaseForm):
     """Alta de oportunidad sin salir del diálogo: la empresa y el contacto se buscan o se crean ahí mismo."""
 
-    new_contact_first_name = forms.CharField(label="Nombre del contacto", required=False, max_length=80)
-    new_contact_last_name = forms.CharField(label="Apellidos", required=False, max_length=120)
-    new_contact_email = forms.EmailField(label="Correo", required=False)
-    new_contact_mobile = forms.CharField(label="Móvil", required=False, max_length=40)
+    CONTACT_FIELDS = ["first_name", "last_name", "position", "email", "mobile", "phone", "legal_basis"]
 
     class Meta:
         model = Opportunity
         fields = ["title", "company", "contact", "stage", "owner", "assignees", "priority", "probability", "expected_close", "source", "description"]
         widgets = {"assignees": forms.CheckboxSelectMultiple}
 
-    field_order = ["title", "company", "new_company", "new_company_event", "contact", "new_contact_first_name", "new_contact_last_name", "new_contact_email", "new_contact_mobile"]
+    field_order = ["title", "company", "new_company", "new_company_event", "contact"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -149,6 +266,10 @@ class OpportunityForm(NewCompanyMixin, BaseForm):
         self.setup_new_company()
         self.fields["company"].help_text = "La empresa u organismo cliente. Si aún no está, escribe su nombre y créala aquí."
         self.fields["contact"].widget.create = "new_contact"
+        _insert_after(self, "contact", dict(_model_field(Contact, name, "new_contact_") for name in self.CONTACT_FIELDS))
+        self.fields["new_contact_first_name"].label = "Nombre del contacto"
+        self.fields["new_contact_legal_basis"].initial = Contact._meta.get_field("legal_basis").default
+        self.fields["new_contact_legal_basis"].help_text = "RGPD: por qué puedes guardar y usar sus datos."
         self.fields["contact"].help_text = "La persona con la que hablas. Búscala o créala aquí."
         if not self.instance.pk:
             del self.fields["probability"]
@@ -158,9 +279,9 @@ class OpportunityForm(NewCompanyMixin, BaseForm):
         if not data.get("company") and not data.get("new_company") and "company" not in self.errors:
             self.add_error("company", "Elige una empresa de la lista o crea una nueva.")
         contact = data.get("contact")
-        if contact and data.get("company") and contact.company_id and contact.company_id != data["company"].pk:
-            self.add_error("contact", f"{contact} es de otra empresa ({contact.company}).")
-        if (data.get("new_contact_last_name") or data.get("new_contact_email") or data.get("new_contact_mobile")) and not data.get("new_contact_first_name"):
+        if contact and data.get("company") and contact.company_id and not contact.works_at(data["company"]):
+            self.add_error("contact", f"{contact} es de otra empresa ({contact.company}). Si también trabaja con esta, añádela en su ficha.")
+        if any(data.get(f"new_contact_{name}") for name in ("last_name", "position", "email", "mobile", "phone")) and not data.get("new_contact_first_name"):
             self.add_error("new_contact_first_name", "Indica al menos el nombre del contacto nuevo.")
         return data
 
@@ -170,10 +291,10 @@ class OpportunityForm(NewCompanyMixin, BaseForm):
         if not data.get("contact") and data.get("new_contact_first_name"):
             email = (data.get("new_contact_email") or "").lower()
             existing = Contact.objects.filter(company=opportunity.company, email__iexact=email).first() if email else None
+            values = {name: data.get(f"new_contact_{name}") or "" for name in self.CONTACT_FIELDS}
+            values.update(email=email, legal_basis=values["legal_basis"] or Contact._meta.get_field("legal_basis").default)
             opportunity.contact = existing or Contact.objects.create(
-                company=opportunity.company, first_name=data["new_contact_first_name"], last_name=data.get("new_contact_last_name", ""),
-                email=email, mobile=data.get("new_contact_mobile", ""), owner=self.user,
-                is_primary=not opportunity.company.contacts.exists(),
+                company=opportunity.company, owner=self.user, is_primary=not opportunity.company.contacts.exists(), **values,
             )
             self.created_contact = None if existing else opportunity.contact
         return super().save(commit)
@@ -222,10 +343,24 @@ class LineForm(BaseForm):
         return line
 
 
+# textarea con sugerencias al escribir «@» (ver app.js)
+MENTIONS = {"data-mentions": "/buscar/user/", "placeholder": "Escribe @ para mencionar a alguien del equipo"}
+
+
 class TaskForm(BaseForm):
     class Meta:
         model = Task
-        fields = ["title", "kind", "due_at", "assignee", "opportunity", "company", "notes"]
+        fields = ["title", "kind", "due_at", "assignee", "assignees", "opportunity", "company", "notes"]
+        widgets = {"assignees": forms.CheckboxSelectMultiple}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["notes"].widget.attrs.update(MENTIONS)
+        self.fields["assignees"].queryset = User.objects.filter(is_active=True)
+
+    def clean_assignees(self):
+        main = self.cleaned_data.get("assignee")
+        return [u for u in self.cleaned_data.get("assignees", []) if u != main]
 
 
 class ActivityForm(BaseForm):
@@ -236,6 +371,7 @@ class ActivityForm(BaseForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["kind"].choices = [c for c in Activity.Kind.choices if c[0] in ("note", "call", "email", "meeting")]
+        self.fields["body"].widget.attrs.update(MENTIONS)
 
 
 class LoseForm(forms.Form):
@@ -383,6 +519,22 @@ class MicrosoftConfigForm(forms.Form):
     client_id = forms.CharField(label="Id. de aplicación (cliente)", max_length=80)
     client_secret = forms.CharField(label="Secreto de cliente (valor)", max_length=200, required=False, widget=forms.PasswordInput(render_value=False),
                                     help_text="Déjalo vacío para conservar el que ya hay.")
+
+
+class NdaForm(forms.ModelForm):
+    """Datos de la otra parte del acuerdo: salen de la empresa y el contacto, y se pueden corregir antes de generar."""
+
+    class Meta:
+        model = Nda
+        fields = ["language", "signed_on", "party_name", "party_address", "party_tax_id", "party_country", "signer_name", "signer_position"]
+        labels = {"language": "Idioma del acuerdo", "party_name": "Razón social del cliente", "signer_name": "Firma por el cliente"}
+        widgets = {"signed_on": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")}
+        help_texts = {
+            "party_name": "La denominación legal completa, con su forma jurídica (S.L., S.A., GmbH, SE…).",
+            "party_tax_id": "CIF/NIF o identificación fiscal de su país.",
+            "party_country": "País conforme a cuyas leyes está constituida.",
+            "signer_name": "Si lo dejas vacío, el nombre se rellena a mano al firmar.",
+        }
 
 
 class TeamsMeetingForm(forms.Form):

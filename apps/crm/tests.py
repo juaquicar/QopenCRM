@@ -2,7 +2,7 @@
 import io
 import re
 import zipfile
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 from django.core import mail
@@ -55,6 +55,7 @@ class LoginTests(Base):
         self.client.post("/entrar/", {"email": "ANA@example.com "})
         self.assertEqual(len(mail.outbox), 1)
         code = re.search(r"\b(\d{6})\b", mail.outbox[0].body).group(1)
+        self.assertTrue(mail.outbox[0].subject.startswith("[QopenCRM] ") and code in mail.outbox[0].subject)
         self.assertContains(self.client.post("/entrar/codigo/", {"code": "000000" if code != "000000" else "111111"}), "incorrecto")
         self.assertRedirects(self.client.post("/entrar/codigo/", {"code": code}), "/")
         self.assertEqual(self.client.get("/").status_code, 200)
@@ -328,7 +329,7 @@ class DataTests(Base):
         Task.objects.create(title="Más adelante", due_at=timezone.now() + timedelta(days=2), assignee=self.ana)
         call_command("send_reminders", verbosity=0)
         call_command("send_reminders", verbosity=0)  # no repite
-        self.assertEqual([m.subject for m in mail.outbox], ["Recordatorio: Llamar ya"])
+        self.assertEqual([m.subject for m in mail.outbox], ["[QopenCRM] Recordatorio: Llamar ya · Fibra Acme, S.L. · Despliegue FTTH"])
         self.assertEqual(mail.outbox[0].to, ["ana@example.com"])
         call_command("send_reminders", "--digest", verbosity=0)
         self.assertTrue(any("Tu día" in m.subject for m in mail.outbox))
@@ -541,6 +542,24 @@ class LeadDialogTests(Base):
         self.post(new_company="Telecable Norte", new_company_event=fair.pk)
         self.assertEqual(Opportunity.objects.get(title="Lead nuevo").company.event, fair)
 
+    def test_new_company_and_contact_take_their_main_fields(self):
+        dialog = self.client.get("/m/opportunity/").content.decode()
+        for name in ("new_company_tax_id", "new_company_city", "new_company_sector", "new_contact_position", "new_contact_legal_basis"):
+            self.assertIn(f'name="{name}"', dialog)
+        self.post(new_company="Telecable Norte", new_company_kind="customer", new_company_tax_id="b-87.654.321", new_company_city="Oviedo",
+                  new_company_province="Asturias", new_company_website="https://telecable.es", new_company_phone="985000000",
+                  new_contact_first_name="Laura", new_contact_position="CTO", new_contact_phone="985111111", new_contact_legal_basis="legitimate")
+        opp = Opportunity.objects.get(title="Lead nuevo")
+        c, p = opp.company, opp.contact
+        self.assertEqual((c.kind, c.tax_id, c.city, c.province, c.phone, c.domain), ("customer", "B87654321", "Oviedo", "Asturias", "985000000", "telecable.es"))
+        self.assertEqual((p.position, p.phone, p.legal_basis), ("CTO", "985111111", "legitimate"))
+        # misma empresa por CIF desde el diálogo de contacto: no se duplica y se completa lo que faltaba
+        base = {"first_name": "Pedro", "owner": self.ana.pk, "legal_basis": Contact._meta.get_field("legal_basis").default}
+        self.client.post("/m/contact/", {**base, "new_company": "Telecable del Norte SA", "new_company_tax_id": "B87654321", "new_company_sector": "Telecomunicaciones"})
+        self.assertEqual(Contact.objects.get(first_name="Pedro").company, c)
+        c.refresh_from_db()
+        self.assertEqual((c.sector, Company.objects.filter(tax_id="B87654321").count()), ("Telecomunicaciones", 1))
+
     def test_existing_company_is_reused_not_duplicated(self):
         self.post(new_company="FIBRA ACME SL")
         self.assertEqual(Opportunity.objects.get(title="Lead nuevo").company, self.acme)
@@ -668,6 +687,16 @@ class EventTests(Base):
         self.acme.refresh_from_db()
         self.assertIsNone(self.acme.event)
 
+    def test_management_and_sales_managers_create_events(self):
+        from apps.crm.models import Event
+
+        for code in ("ceo", "director", "responsable-comercial"):
+            user = User.objects.create_user(f"{code}@example.com", name=code, role=Role.objects.get(code=code))
+            self.client.force_login(user)
+            self.assertContains(self.client.get("/eventos/"), "/m/event/")
+            self.client.post("/m/event/", {"name": f"Feria de {code}", "kind": "fair"})
+            self.assertTrue(Event.objects.filter(name=f"Feria de {code}", created_by=user).exists())
+
     def test_listed_by_date(self):
         from apps.crm.models import Event
 
@@ -757,3 +786,447 @@ class DemoSeedTests(TestCase):
         self.assertEqual(Opportunity.objects.filter(on_hold_until__isnull=False).count(), 1)
         with self.assertRaises(CommandError):
             call_command("seed_demo", stdout=StringIO())
+
+
+class MentionTests(Base):
+    """@usuario en notas y tareas: aviso en el CRM y correo a quien se nombra."""
+
+    def setUp(self):
+        self.client.force_login(self.ana)
+
+    def test_note_mention_notifies_and_emails(self):
+        from apps.crm.models import Notification
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post("/actividad/", {"company": self.acme.pk, "kind": "note",
+                                                        "body": "Revisa esto @luis y @jefe, copia a ana@acme.es y a @nadie"})
+        self.assertContains(response, '<span class="mention">@luis</span>')
+        self.assertEqual(sorted(n.recipient.email for n in Notification.objects.all()), ["jefe@example.com", "luis@example.com"])
+        self.assertEqual(sorted(m.to[0] for m in mail.outbox), ["jefe@example.com", "luis@example.com"])
+        self.assertEqual(mail.outbox[0].subject, "[QopenCRM] Ana Ventas te ha mencionado · Fibra Acme, S.L.")
+        # Luis ve el aviso, lo abre y queda leído
+        self.client.force_login(self.luis)
+        home = self.client.get("/").content.decode()
+        self.assertIn("te ha mencionado", home)  # últimas menciones en Hoy, encima de la actividad
+        self.assertLess(home.index("<h2>Menciones</h2>"), home.index("Última actividad"))
+        self.assertLess(home.index("Última actividad"), home.index("Sin próxima acción"))
+        note = Notification.objects.get(recipient=self.luis)
+        self.assertContains(self.client.get("/avisos/"), "Revisa esto")
+        self.assertRedirects(self.client.get(f"/avisos/{note.pk}/"), f"/cuentas/{self.acme.pk}/", fetch_redirect_response=False)
+        note.refresh_from_db()
+        self.assertIsNotNone(note.read_at)
+        self.assertEqual(self.client.get(f"/avisos/{Notification.objects.get(recipient=self.boss).pk}/").status_code, 404)
+
+    def test_self_mention_and_edits_do_not_repeat(self):
+        from apps.crm.models import Notification
+        opp = self.make_opp()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post("/m/task/", {"title": "Llamar", "kind": "todo", "due_at": "2026-12-01T09:00", "assignee": self.ana.pk,
+                                          "opportunity": opp.pk, "notes": "Yo @ana y @luis"})
+        task = Task.objects.get(title="Llamar")
+        self.assertEqual([n.recipient for n in Notification.objects.all()], [self.luis])
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(f"/m/task/{task.pk}/", {"title": "Llamar", "kind": "todo", "due_at": "2026-12-01T09:00", "assignee": self.ana.pk,
+                                                     "opportunity": opp.pk, "notes": "Yo @ana y @luis, y ahora @jefe"})
+        self.assertEqual(sorted(n.recipient.email for n in Notification.objects.all()), ["jefe@example.com", "luis@example.com"])
+        self.assertEqual(Notification.objects.get(recipient=self.boss).url, f"/oportunidades/{opp.pk}/")
+        self.assertEqual(mail.outbox[-1].subject, "[QopenCRM] Ana Ventas te ha mencionado · Fibra Acme, S.L. · Despliegue FTTH")
+
+    def test_everyone_notifies_lead_company_and_contact_people(self):
+        from apps.crm.models import Contact, Notification
+
+        marta = User.objects.create_user("marta@example.com", name="Marta Ventas", role=self.ana.role)
+        pablo = User.objects.create_user("pablo@example.com", name="Pablo Ventas", role=self.ana.role)
+        fuera = User.objects.create_user("fuera@example.com", name="Otro Ventas", role=self.ana.role)
+        self.acme.owner = self.luis
+        self.acme.save()
+        contact = Contact.objects.create(company=self.acme, first_name="Greta", owner=marta)
+        opp = self.make_opp(contact=contact)  # responsable: Ana, que es quien escribe
+        opp.assignees.add(pablo, self.luis)
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post("/actividad/", {"company": self.acme.pk, "opportunity": opp.pk, "kind": "note", "body": "Ojo @todos: piden NDA"})
+        self.assertContains(response, '<span class="mention">@todos</span>')
+        emails = ["luis@example.com", "marta@example.com", "pablo@example.com"]  # sin repetir a Luis, sin Ana y sin quien no tiene que ver
+        self.assertEqual(sorted(n.recipient.email for n in Notification.objects.all()), emails)
+        self.assertEqual(sorted(m.to[0] for m in mail.outbox), emails)
+        self.assertFalse(Notification.objects.filter(recipient=fuera).exists())
+        # otro lo escribe: también avisa a Ana, la responsable del lead
+        self.client.force_login(self.luis)
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post("/actividad/", {"company": self.acme.pk, "opportunity": opp.pk, "kind": "note", "body": "@todos y @jefe, hecho"})
+        self.assertEqual(sorted(n.recipient.email for n in Notification.objects.filter(actor=self.luis)),
+                         ["ana@example.com", "jefe@example.com", "marta@example.com", "pablo@example.com"])
+        self.assertEqual(self.client.get("/buscar/user/", {"q": "to"}).json()["results"][0]["handle"], "todos")
+
+    def test_user_lookup_gives_handles(self):
+        found = self.client.get("/buscar/user/", {"q": "luis"}).json()["results"]
+        self.assertEqual([(r["label"], r["handle"]) for r in found], [("Luis Ventas", "luis")])
+
+
+class StripePriceTests(Base):
+    """Precios mensual, anual y por usuario desde Stripe, sin duplicar productos."""
+
+    @staticmethod
+    def price(name, interval, flat, users, product_id="prod_1", active=True):
+        return {"id": f"price_{name}_{interval}", "currency": "eur", "recurring": {"interval": interval},
+                "product": {"id": product_id, "name": name, "active": active, "description": ""},
+                "tiers": [{"up_to": 1, "unit_amount": 0, "flat_amount": flat}, {"up_to": None, "unit_amount": users, "flat_amount": flat}]}
+
+    def test_sync_updates_existing_and_creates_missing(self):
+        from apps.catalog import stripe
+        prices = [
+            self.price("Atlas TELCO - PRO", "month", 34900, 785, "prod_pro"), self.price("Atlas TELCO - PRO", "year", 376920, 8477, "prod_pro"),
+            self.price("Atlas TELCO - VIEW", "month", 2990, 158, "prod_view"), self.price("Atlas TELCO - VIEW", "year", 32292, 1701, "prod_view"),
+            self.price("Atlas TELCO - FREE", "month", 0, 0, "prod_old", active=False),
+            {**self.price("Otra cosa", "month", 100, 0, "prod_usd"), "currency": "usd"},
+        ]
+        self.pro.code = "ATLAS-TELCO-PRO"
+        self.pro.save()
+        before = Product.objects.count()
+        result = stripe.sync(prices)
+        self.pro.refresh_from_db()
+        self.assertEqual((self.pro.price, self.pro.price_annual, self.pro.stripe_product_id), (Decimal("349.00"), Decimal("3769.20"), "prod_pro"))
+        self.assertEqual(self.pro.user_tiers, [{"up_to": None, "month": 7.85, "year": 84.77}])
+        self.assertEqual([(p.code, p.family.name.upper(), p.tier_level) for p in result["created"]], [("ATLAS-TELCO-VIEW", "ATLAS TELCO", 0)])
+        self.assertEqual(Product.objects.count(), before + 1)
+        # la segunda pasada casa por id de Stripe aunque cambien código o nombre: no duplica
+        Product.objects.filter(code="ATLAS-TELCO-VIEW").update(code="VIEW", name="Visor")
+        result = stripe.sync(prices)
+        self.assertEqual((len(result["created"]), len(result["same"])), (0, 2))
+        self.assertEqual(Product.objects.count(), before + 1)
+
+    def test_button_needs_catalog_permission(self):
+        self.client.force_login(self.ana)
+        self.assertEqual(self.client.post("/productos/stripe/").status_code, 403)
+        self.client.force_login(self.boss)
+        with override_settings(STRIPE_SECRET_KEY=""):
+            response = self.client.post("/productos/stripe/", follow=True)
+        self.assertContains(response, "Falta STRIPE_SECRET_KEY")
+
+
+class LeadHistoryTests(Base):
+    """Cambios en los leads al historial, y lo que ve cada rol en Hoy."""
+
+    def test_lead_edits_and_lines_are_recorded(self):
+        self.client.force_login(self.ana)
+        opp = self.make_opp()
+        form = {"title": "Despliegue FTTH", "company": self.acme.pk, "stage": opp.stage_id, "owner": self.luis.pk, "priority": 3, "probability": 40}
+        self.client.post(f"/m/opportunity/{opp.pk}/", form)
+        change = Activity.objects.get(opportunity=opp, subject__startswith="Lead modificado")
+        self.assertIn("Responsable: Ana Ventas → Luis Ventas", change.body)
+        self.assertIn("responsable", change.subject)
+        self.client.post(f"/m/opportunity/{opp.pk}/", form)  # sin cambios: no ensucia el historial
+        self.assertEqual(Activity.objects.filter(opportunity=opp, subject__startswith="Lead modificado").count(), 1)
+        self.client.force_login(self.boss)
+        self.client.post(f"/m/line/?opportunity={opp.pk}", {"product": self.pro.pk, "quantity": "2", "discount": "0", "period": "monthly", "unit_price": "500"})
+        line = opp.lines.get()
+        self.client.post(f"/m/line/{line.pk}/borrar/")
+        self.assertEqual(list(Activity.objects.filter(opportunity=opp, subject__startswith="Línea").values_list("subject", flat=True).order_by("id")),
+                         ["Línea añadida: Telco Pro", "Línea quitada: Telco Pro"])
+
+    def test_home_by_role(self):
+        Contact.objects.create(company=self.other, first_name="Marta", last_name="Oculta")
+        self.client.force_login(self.boss)
+        home = self.client.get("/")
+        self.assertContains(home, "Últimas empresas")
+        self.assertContains(home, "Marta Oculta")
+        self.assertContains(home, "Todo el equipo · etapas y cambios de leads")
+        self.assertContains(home, ">Leads<", html=False)
+        self.client.force_login(self.ana)
+        home = self.client.get("/")
+        self.assertNotContains(home, "Últimas empresas")
+        self.assertNotContains(home, "Todo el equipo · etapas")
+
+
+class ContactManyTests(Base):
+    """Una persona en varias empresas, con varios correos y teléfonos."""
+
+    def setUp(self):
+        self.client.force_login(self.boss)
+
+    def save_contact(self, pk=None, **data):
+        base = {"first_name": "Marta", "last_name": "Gil", "owner": self.ana.pk, "legal_basis": "legitimate",
+                "company": self.acme.pk, "email": "Marta@Acme.es", "mobile": "600000000"}
+        return self.client.post(f"/m/contact/{pk}/" if pk else "/m/contact/", {**base, **data})
+
+    def test_several_companies_emails_and_phones(self):
+        self.save_contact(other_companies=[self.other.pk, self.acme.pk], extra_emails="marta@gmail.com\nMARTA@consultora.es",
+                          extra_phones="91 000 00 00 centralita\n600000000")
+        marta = Contact.objects.get(first_name="Marta")
+        self.assertEqual(list(marta.other_companies.all()), [self.other])  # la principal no se repite
+        self.assertEqual(marta.values("email"), ["marta@acme.es", "marta@gmail.com", "marta@consultora.es"])
+        self.assertEqual(marta.values("phone"), ["600000000", "91 000 00 00 centralita"])
+        # sale en la ficha de las dos empresas y se puede usar en un lead de cualquiera
+        page = self.client.get(f"/cuentas/{self.other.pk}/")
+        self.assertContains(page, "Marta Gil")
+        self.assertContains(page, "También en esta empresa")
+        self.assertContains(page, 'href="tel:910000000"')
+        Opportunity.objects.create(title="Otro lead", company=self.other, stage=self.stages["Nuevo lead"], owner=self.luis)
+        response = self.client.post("/m/opportunity/", {"title": "Lead de Redes", "company": self.other.pk, "contact": marta.pk,
+                                                         "stage": self.stages["Nuevo lead"].pk, "owner": self.luis.pk, "priority": 2})
+        self.assertEqual(Opportunity.objects.get(title="Lead de Redes").contact, marta, response.content[:300])
+        # Luis la ve por su empresa y la encuentra por un correo secundario
+        self.client.force_login(self.luis)
+        self.assertEqual([r["label"] for r in self.client.get("/buscar/contact/", {"q": "consultora"}).json()["results"]], ["Marta Gil"])
+        self.assertEqual([r["label"] for r in self.client.get("/buscar/contact/", {"company": self.other.pk}).json()["results"]], ["Marta Gil"])
+        # editar conserva y permite cambiar los adicionales; un correo mal escrito se avisa
+        self.client.force_login(self.boss)
+        self.assertContains(self.client.get(f"/m/contact/{marta.pk}/"), "marta@gmail.com")
+        self.assertContains(self.save_contact(marta.pk, extra_emails="esto no es un correo"), "No parece un correo")
+        self.save_contact(marta.pk, other_companies=[self.other.pk], extra_emails="marta@gmail.com")
+        self.assertEqual(marta.values("email"), ["marta@acme.es", "marta@gmail.com"])
+        self.assertEqual(marta.values("phone"), ["600000000"])
+
+    def test_mail_capture_and_erase_use_all_addresses(self):
+        from apps.integrations.mail import Matcher
+        marta = Contact.objects.create(company=self.acme, first_name="Marta", email="marta@acme.es")
+        marta.set_channels("email", ["Marta@Gmail.com"])
+        self.assertEqual(Matcher().contact_for("marta@gmail.com"), marta)
+        marta.erase()
+        self.assertEqual(marta.values("email"), [])
+
+
+class SharedTaskTests(Base):
+    """Una próxima acción para varias personas."""
+
+    def test_quick_next_for_several_people(self):
+        opp = self.make_opp(owner=self.ana)
+        self.client.force_login(self.ana)
+        self.client.post("/tareas/rapida/", {"title": "Demo con el cliente", "opportunity": opp.pk, "quick": "1",
+                                             "assignee": [self.luis.pk, self.ana.pk, self.boss.pk]})
+        task = Task.objects.get(title="Demo con el cliente")
+        self.assertEqual(task.assignee, self.ana)  # quien la crea, si se ha marcado, es la responsable
+        self.assertEqual(set(task.assignees.all()), {self.luis, self.boss})
+        self.assertIsNotNone(Opportunity.objects.get(pk=opp.pk).next_action_at)
+        # Luis la ve en su Hoy aunque no sea su lead, y puede marcarla
+        self.client.force_login(self.luis)
+        self.assertContains(self.client.get("/?"), "Demo con el cliente")
+        self.assertContains(self.client.get("/tareas/?when=week"), "Demo con el cliente")
+        self.client.post(f"/tareas/{task.pk}/hecha/", {"ask_next": "0"})
+        self.assertIsNotNone(Task.objects.get(pk=task.pk).done_at)
+
+    def test_reminder_goes_to_everyone(self):
+        task = Task.objects.create(title="Llamar juntos", due_at=timezone.now() + timedelta(minutes=5), assignee=self.ana)
+        task.assignees.set([self.luis])
+        mail.outbox.clear()
+        call_command("send_reminders", verbosity=0)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(set(mail.outbox[0].to), {self.ana.email, self.luis.email})
+
+    def test_task_form_keeps_main_person_out_of_the_others(self):
+        self.client.force_login(self.boss)
+        self.client.post("/m/task/", {"title": "Preparar oferta", "kind": "todo", "due_at": "2026-12-01T09:00", "assignee": self.ana.pk,
+                                      "assignees": [self.ana.pk, self.luis.pk]})
+        task = Task.objects.get(title="Preparar oferta")
+        self.assertEqual([u.pk for u in task.people()], [self.ana.pk, self.luis.pk])
+
+
+class MobileAppTests(Base):
+    """La web usada como app en el móvil: ficha de contacto, tarjeta para la agenda, buscador único y compartir."""
+
+    def setUp(self):
+        self.marta = Contact.objects.create(company=self.acme, first_name="Marta", last_name="Ruiz; Ortega", position="Directora técnica",
+                                            email="marta@acme.es", mobile="612 345 678", phone="954 00 11 22 centralita", owner=self.ana)
+        self.marta.set_channels("email", ["m.ruiz@gmail.com"])
+
+    def test_contact_page_puts_the_phone_to_work(self):
+        opp = self.make_opp(contact=self.marta)
+        Activity.objects.create(company=self.acme, contact=self.marta, user=self.ana, kind="call", body="Quiere demo el martes")
+        self.client.force_login(self.ana)
+        page = self.client.get(f"/contactos/{self.marta.pk}/")
+        for text in ('href="tel:612345678"', "https://wa.me/34612345678", 'href="mailto:marta@acme.es"', "m.ruiz@gmail.com",
+                     f"/contactos/{self.marta.pk}/vcard/", opp.title, "Quiere demo el martes", f"/cuentas/{self.acme.pk}/"):
+            self.assertContains(page, text)
+        self.assertTrue(AccessLog.objects.filter(action="view", object_type="contact", object_id=str(self.marta.pk)).exists())
+        # la lista lleva a la ficha y deja llamar sin entrar en ella
+        self.assertContains(self.client.get("/contactos/"), f'data-href="/contactos/{self.marta.pk}/"')
+        # Luis no lleva esa empresa: no ve a la persona
+        self.client.force_login(self.luis)
+        self.assertEqual(self.client.get(f"/contactos/{self.marta.pk}/").status_code, 404)
+        self.assertEqual(self.client.get(f"/contactos/{self.marta.pk}/vcard/").status_code, 404)
+
+    def test_vcard_for_the_phone_book(self):
+        self.client.force_login(self.ana)
+        response = self.client.get(f"/contactos/{self.marta.pk}/vcard/")
+        self.assertEqual(response["Content-Type"], "text/vcard; charset=utf-8")
+        self.assertIn(".vcf", response["Content-Disposition"])
+        card = response.content.decode()
+        for line in ("BEGIN:VCARD", r"N:Ruiz\; Ortega;Marta;;;", r"FN:Marta Ruiz\; Ortega", r"ORG:Fibra Acme\, S.L.", "TITLE:Directora técnica",
+                     "TEL;TYPE=CELL:612345678", "TEL;TYPE=WORK:954001122", "EMAIL;TYPE=WORK:marta@acme.es", "EMAIL;TYPE=WORK:m.ruiz@gmail.com", "END:VCARD"):
+            self.assertIn(line + "\r\n", card)
+        self.assertTrue(AccessLog.objects.filter(action="export", object_type="contact").exists())
+        self.marta.erase()  # tras la supresión RGPD ya no hay tarjeta que descargar
+        self.assertEqual(self.client.get(f"/contactos/{self.marta.pk}/vcard/").status_code, 404)
+
+    def test_one_search_for_everything(self):
+        opp = self.make_opp()
+        self.client.force_login(self.ana)
+        page = self.client.get("/busqueda/?q=acme")
+        self.assertContains(page, f"/cuentas/{self.acme.pk}/")
+        self.assertContains(page, f"/oportunidades/{opp.pk}/")
+        self.assertContains(page, f"/contactos/{self.marta.pk}/")  # por el nombre de su empresa
+        self.assertContains(self.client.get("/busqueda/?q=612 345"), f"/contactos/{self.marta.pk}/")
+        self.assertContains(self.client.get("/busqueda/?q=a"), "al menos dos letras")
+        partial = self.client.get("/busqueda/?q=marta", headers={"HX-Request": "true"})
+        self.assertContains(partial, "Marta Ruiz")
+        self.assertNotContains(partial, "<html")
+        # cada uno busca solo en lo suyo
+        self.client.force_login(self.luis)
+        page = self.client.get("/busqueda/?q=acme")
+        self.assertNotContains(page, f"/cuentas/{self.acme.pk}/")
+        self.assertNotContains(page, f"/oportunidades/{opp.pk}/")
+
+    def test_shared_text_and_app_shortcuts(self):
+        self.client.force_login(self.ana)
+        page = self.client.get("/compartir/", {"title": "Firma", "text": "Marta Ruiz\n612 345 678", "url": "https://acme.es"})
+        self.assertContains(page, "Marta Ruiz\n612 345 678\nhttps://acme.es")
+        self.assertContains(page, 'data-share data-modal="/m/contact/"')
+        manifest = self.client.get("/manifest.webmanifest").json()
+        self.assertEqual(manifest["share_target"]["action"], "/compartir/")
+        self.assertIn("/contactos/?nuevo=contact", [s["url"] for s in manifest["shortcuts"]])
+        # el alta de contacto ofrece la agenda del móvil; al editar, no
+        self.assertContains(self.client.get("/m/contact/"), "data-pick-contact")
+        self.assertNotContains(self.client.get(f"/m/contact/{self.marta.pk}/"), "data-pick-contact")
+        self.assertContains(self.client.get("/m/contact/"), 'inputmode="tel"')
+
+    def test_app_shell(self):
+        opp = self.make_opp(contact=self.marta)
+        self.client.force_login(self.ana)
+        home = self.client.get("/")
+        for text in ('class="appbar"', 'class="tabbar"', 'data-sheet="#more"', 'id="dial"', 'data-depth="0"', "/busqueda/"):
+            self.assertContains(home, text)
+        lead = self.client.get(f"/oportunidades/{opp.pk}/")
+        self.assertContains(lead, 'data-depth="1"')
+        self.assertContains(lead, 'href="/pipeline/" data-back')
+        self.assertContains(lead, "https://wa.me/34612345678")
+        self.assertNotContains(lead, 'id="dial"')
+        # una oportunidad sin contacto no rompe la ficha: las acciones salen desactivadas
+        bare = self.make_opp()
+        self.assertContains(self.client.get(f"/oportunidades/{bare.pk}/"), 'aria-disabled="true"')
+        self.assertContains(self.client.get("/pipeline/"), "data-stage-tab")
+        self.assertContains(self.client.get("/sw.js"), "Sin conexión")
+
+    def test_whatsapp_number(self):
+        from apps.crm.templatetags.crm import wa_href
+        self.assertEqual(wa_href("612 345 678"), "34612345678")
+        self.assertEqual(wa_href("+34 612 34 56 78 personal"), "34612345678")
+        self.assertEqual(wa_href("0033 1 23 45 67 89"), "33123456789")
+        self.assertEqual(wa_href(""), "")
+
+
+class NdaTests(Base):
+    """Acuerdo de confidencialidad desde la ficha del lead, en español o en inglés."""
+
+    def setUp(self):
+        from apps.crm.models import Contact
+
+        self.acme.address, self.acme.city, self.acme.province, self.acme.country = "Friedrich-Ebert-Straße 75", "Bergisch Gladbach", "", "Alemania"
+        self.acme.save()
+        contact = Contact.objects.create(company=self.acme, first_name="Greta", last_name="Weber", position="Managing Director")
+        self.opp = self.make_opp(contact=contact)
+        self.enterContext(self.settings(MEDIA_ROOT=self.enterContext(__import__("tempfile").TemporaryDirectory())))
+        self.client.force_login(self.ana)
+
+    def post(self, **data):
+        return self.client.post(f"/oportunidades/{self.opp.pk}/nda/", {
+            "language": "es", "signed_on": "2026-11-27", "party_name": "Fibra Acme GmbH", "party_address": "Friedrich-Ebert-Straße 75, Bergisch Gladbach",
+            "party_tax_id": "DE362031271", "party_country": "Alemania", "signer_name": "Greta Weber", "signer_position": "Managing Director", **data})
+
+    def test_dialog_prefilled_from_company_and_contact(self):
+        page = self.client.get(f"/oportunidades/{self.opp.pk}/nda/")
+        self.assertContains(page, "Friedrich-Ebert-Straße 75, Bergisch Gladbach, Alemania")
+        self.assertContains(page, "Greta Weber")
+        self.assertContains(page, "Managing Director")
+        self.assertContains(page, "B12345678")
+
+    def test_generates_pdf_in_both_languages(self):
+        from apps.sales.models import Nda
+
+        self.assertEqual(self.post().status_code, 204)
+        self.assertEqual(self.post(language="en").status_code, 204)
+        english, spanish = Nda.objects.all()
+        self.assertEqual((spanish.language, english.language), ("es", "en"))
+        for nda in (spanish, english):
+            response = self.client.get(f"/nda/{nda.pk}/pdf/")
+            self.assertEqual(response["Content-Type"], "application/pdf")
+            self.assertTrue(b"".join(response.streaming_content).startswith(b"%PDF"))
+        self.assertTrue(self.opp.activities.filter(subject__startswith="NDA generado en inglés").exists())
+        self.assertContains(self.client.get(f"/oportunidades/{self.opp.pk}/"), "Fibra Acme GmbH")
+
+    def test_text_uses_both_parties_and_configured_courts(self):
+        from apps.sales import services
+        from apps.sales.models import Nda
+        from django.template.loader import render_to_string
+        from unittest import mock
+
+        self.post()
+        self.post(language="en")
+        captured = []
+        real = render_to_string
+        with mock.patch.object(services, "render_to_string", side_effect=lambda *a, **k: captured.append(real(*a, **k)) or captured[-1]):
+            for nda in Nda.objects.order_by("language"):
+                services.render_nda_pdf(nda)
+        english, spanish = captured
+        self.assertIn("Courts and Tribunals of the city of Madrid", english)
+        self.assertIn("incorporated under the laws of Germany", english)
+        self.assertIn("27 November 2026", english)
+        self.assertIn("Juzgados y Tribunales de la ciudad de Madrid", spanish)
+        self.assertIn("27 de noviembre de 2026", spanish)
+        for text in captured:
+            for value in ("TU EMPRESA, S.L.", "B00000000", "Fibra Acme GmbH", "DE362031271", "Greta Weber", "Managing Director"):
+                self.assertIn(value, text)
+
+    def test_requires_name_and_address(self):
+        from apps.sales.models import Nda
+
+        response = self.post(party_address="")
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Nda.objects.exists())
+
+    def test_other_salesperson_cannot_generate_open_or_delete(self):
+        from apps.sales.models import Nda
+
+        self.post()
+        nda = Nda.objects.get()
+        self.client.force_login(self.luis)
+        self.assertEqual(self.client.get(f"/oportunidades/{self.opp.pk}/nda/").status_code, 404)
+        self.assertEqual(self.client.get(f"/nda/{nda.pk}/pdf/").status_code, 404)
+        self.assertEqual(self.client.post(f"/nda/{nda.pk}/borrar/").status_code, 404)
+        self.client.force_login(self.ana)
+        self.assertEqual(self.client.post(f"/nda/{nda.pk}/borrar/").status_code, 302)
+        self.assertFalse(Nda.objects.exists())
+
+
+class TeamsMeetingCardTests(Base):
+    """Las reuniones de Teams convocadas se ven en el historial como una tarjeta con su botón de acceso."""
+
+    URL = "https://teams.microsoft.com/l/meetup-join/19%3ameeting_x%40thread.v2/0?context=%7b%22Tid%22%3a%22t%22%7d"
+
+    def meeting(self, opp, body):
+        return Activity.objects.create(company=self.acme, opportunity=opp, user=self.ana, kind=Activity.Kind.MEETING, source="teams",
+                                       occurred_at=timezone.make_aware(datetime(2026, 12, 1, 10, 0)), subject="Reunión de Teams convocada: Próximos pasos", body=body)
+
+    def test_card_with_join_button_and_details(self):
+        opp = self.make_opp()
+        self.meeting(opp, f"Convocada desde ana@example.onmicrosoft.com para paco@acme.es, luis@example.com.\nDuración: 90 min\nEnlace: {self.URL}\n\nTraed el pliego")
+        Task.objects.create(title="Reunión de Teams: Próximos pasos", kind=Task.Kind.MEETING, due_at=timezone.now(), assignee=self.ana, opportunity=opp, company=self.acme, notes=self.URL)
+        self.client.force_login(self.ana)
+        page = self.client.get(f"/oportunidades/{opp.pk}/").content.decode()
+        from django.utils.html import escape
+        self.assertIn(f'href="{escape(self.URL)}" target="_blank" rel="noopener"><svg', page)
+        self.assertIn("Unirse a la reunión", page)
+        self.assertIn("mar 1 dic 2026, 10:00–11:30", page)
+        self.assertIn("1 h 30 min", page)
+        self.assertIn('href="mailto:paco@acme.es"', page)
+        self.assertIn("Traed el pliego", page)
+        self.assertNotIn("Enlace: https", page)  # el enlace ya no sale como texto suelto
+        self.assertIn(">Unirse</a>", page)  # también en la próxima acción
+
+    def test_meetings_convened_before_keep_working(self):
+        opp = self.make_opp()
+        self.meeting(opp, f"Convocada desde ana@example.onmicrosoft.com para paco@acme.es.\nEnlace: {self.URL}")
+        note = Activity.objects.create(company=self.acme, opportunity=opp, user=self.ana, kind=Activity.Kind.MEETING, body="Reunión presencial en su oficina")
+        self.client.force_login(self.ana)
+        page = self.client.get(f"/oportunidades/{opp.pk}/").content.decode()
+        self.assertIn("Unirse a la reunión", page)
+        self.assertIn("mar 1 dic 2026, 10:00<", page.replace(" <", "<"))
+        self.assertIn(note.body, page)

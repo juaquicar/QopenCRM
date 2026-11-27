@@ -3,9 +3,11 @@
   <header><h2>{{ title }}</h2><button type="button" class="iconbtn" data-close aria-label="Cerrar">{% icon "x" %}</button></header>
   <div class="content">
     {% if hint %}<p class="muted small" style="margin-bottom:12px">{{ hint }}</p>{% endif %}
-    {% if ai_kind %}<details class="ai-fill" style="margin-bottom:12px"><summary class="link small">✦ Rellenar con IA desde un texto</summary>
+    {% if pick_contact %}<button type="button" class="btn ghost sm" data-pick-contact hidden style="margin-bottom:12px">{% icon "addressbook" %}Traer de la agenda del móvil</button>{% endif %}
+    {% if ai_kind %}<details class="ai-fill" style="margin-bottom:12px"><summary class="link small">✦ Rellenar con IA: desde un texto o buscando en internet</summary>
       <div class="stack" style="gap:8px;margin-top:8px"><textarea id="ai-text" rows="4" placeholder="Pega una firma de correo, una tarjeta o un párrafo de su web…" aria-label="Texto para la IA"></textarea>
-      <div class="row"><button type="button" class="btn ghost sm" data-ai-fill="{% url 'ai_extract' ai_kind %}">Rellenar campos</button><span class="muted small" id="ai-status">Solo se envía este texto al proveedor de IA. Revisa los datos antes de guardar.</span></div></div></details>{% endif %}
+      <div class="row"><button type="button" class="btn ghost sm" data-ai-fill="{% url 'ai_extract' ai_kind %}">Rellenar desde el texto</button><button type="button" class="btn ghost sm" data-ai-web="{% url 'ai_lookup' ai_kind %}">Buscar en internet</button></div>
+      <span class="muted small" id="ai-status">{% if ai_kind == "company" %}Para buscar en internet basta con el nombre o la web.{% else %}Para buscar en internet escribe nombre y apellidos o empresa: solo trae datos profesionales publicados.{% endif %} Al proveedor de IA solo se le envía eso y el texto pegado. Revisa los datos antes de guardar.</span></div></details>{% endif %}
     {% if form.non_field_errors %}<div class="alert" style="margin-bottom:12px">{{ form.non_field_errors }}</div>{% endif %}
     <div class="form-grid {% if wide %}two{% endif %}">
       {% for field in form %}
@@ -13,7 +15,9 @@
         {% elif field.widget_type == "checkbox" %}
           <div class="field check">{{ field }}<label for="{{ field.id_for_label }}">{{ field.label }}</label>{% for e in field.errors %}<span class="err">{{ e }}</span>{% endfor %}</div>
         {% else %}
-          <div class="field {% if field.widget_type == 'textarea' or field.widget_type == 'checkboxselectmultiple' or field.name == 'title' or field.name == 'name' %}full{% endif %}" {% if field.name|slice:":12" == "new_contact_" %}data-new-contact {% if not form.new_contact_first_name.value %}hidden{% endif %}{% endif %} {% if field.name == "new_company_event" %}data-new-company {% if not form.new_company.value %}hidden{% endif %}{% endif %}>
+          {% if field.name == "new_company_kind" %}<div class="field full form-sub" data-new-company {% if not form.new_company.value %}hidden{% endif %}>Empresa nueva <span class="muted">Rellena lo que sepas; el resto puede esperar.</span></div>{% endif %}
+          {% if field.name == "new_contact_first_name" %}<div class="field full form-sub" data-new-contact {% if not form.new_contact_first_name.value %}hidden{% endif %}>Contacto nuevo</div>{% endif %}
+          <div class="field {% if field.widget_type == 'textarea' or field.widget_type == 'checkboxselectmultiple' or field.name == 'title' or field.name == 'name' or field.name == 'new_contact_legal_basis' %}full{% elif form.new_company and field.name == 'company' or form.new_contact_first_name and field.name == 'contact' %}full{% endif %}" {% if field.name|slice:":12" == "new_contact_" %}data-new-contact {% if not form.new_contact_first_name.value %}hidden{% endif %}{% endif %} {% if field.name|slice:":12" == "new_company_" %}data-new-company {% if not form.new_company.value %}hidden{% endif %}{% endif %}>
             <label for="{{ field.id_for_label }}">{{ field.label }}{% if not field.field.required and not field.field.mandatory %} <span class="muted">· opcional</span>{% endif %}</label>
             {{ field }}
             {% if field.name == "product" and line_prices %}<span class="help" id="line-hint"></span>{% endif %}

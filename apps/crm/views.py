@@ -1,3 +1,4 @@
+import re
 import secrets
 from datetime import datetime, time, timedelta
 from decimal import Decimal
@@ -20,19 +21,20 @@ from django.views.decorators.http import require_POST
 
 from apps.accounts.models import AccessLog, Role, User, log_access
 from apps.accounts.permissions import scope
+from apps.catalog import stripe
 from apps.catalog.models import BillingModel, Product, ProductFamily
 from apps.incentives import forms as incentive_forms
 from apps.integrations import ai, mcp, microsoft, oauth
 from apps.integrations.models import ApiKey, MicrosoftAccount, MicrosoftConfig, Webhook, WebhookDelivery
 from apps.integrations.webhooks import emit
 from apps.sales import services
-from apps.sales.models import HourBank, HourEntry, Quote, QuoteTemplate, Subscription
+from apps.sales.models import HourBank, HourEntry, Nda, Quote, QuoteTemplate, Subscription
 
-from . import forms, manual, reports
+from . import forms, history, manual, mentions, reports
 from .exporters import export_zip
 from .filters import CompanyFilter, ContactFilter, OpportunityFilter, TaskFilter
 from .importers import import_csv
-from .models import Activity, Company, Contact, Event, LossReason, Opportunity, OpportunityLine, Stage, Task
+from .models import Activity, Company, Contact, Event, LossReason, Notification, Opportunity, OpportunityLine, Stage, Task
 
 
 def superuser_required(view):
@@ -67,7 +69,7 @@ def home(request):
     user = request.user
     now = timezone.now()
     start = timezone.localtime().replace(hour=0, minute=0, second=0, microsecond=0)
-    mine = Task.objects.filter(assignee=user, done_at__isnull=True).select_related("opportunity", "company")
+    mine = Task.of(user).filter(done_at__isnull=True).select_related("opportunity", "company", "assignee").prefetch_related("assignees")
     open_opps = visible(Opportunity, user).filter(stage__is_won=False, stage__is_lost=False).select_related("company", "stage", "owner")
     my_opps = open_opps.filter(Q(owner=user) | Q(assignees=user)).distinct()
     return render(request, "crm/home.html", {
@@ -76,7 +78,11 @@ def home(request):
         "upcoming": mine.filter(due_at__gte=start + timedelta(days=1), due_at__lt=start + timedelta(days=8)),
         "no_action": (open_opps if user.sees_all else my_opps).filter(next_action_at__isnull=True)[:30],
         "my_opps_count": my_opps.count(),
-        "recent": scope(Activity.objects.all(), user).select_related("company", "user", "opportunity")[:12],
+        # CEO, Director y Responsable Comercial siguen al equipo entero: cambios de etapa y de leads incluidos
+        "recent": scope(Activity.objects.all(), user).select_related("company", "user", "opportunity")[:20 if user.leads_team else 12],
+        "new_companies": Company.objects.select_related("owner").order_by("-created_at")[:6] if user.is_management else None,
+        "new_contacts": Contact.objects.filter(erased_at__isnull=True).select_related("company", "owner").order_by("-created_at")[:6] if user.is_management else None,
+        "mentions": Notification.objects.filter(recipient=user).select_related("actor", "company", "opportunity")[:5],
         "now": now,
     })
 
@@ -124,9 +130,10 @@ def opportunity_detail(request, pk):
         "opp": opp, "company": opp.company,
         "stages": Stage.objects.all(),
         "lines": opp.lines.select_related("product"),
-        "tasks": opp.tasks.select_related("assignee").order_by("done_at", "due_at"),
+        "tasks": opp.tasks.select_related("assignee").prefetch_related("assignees").order_by("done_at", "due_at"),
         "timeline": opp.activities.select_related("user", "contact"),
         "quotes": opp.quotes.all(),
+        "ndas": opp.ndas.all(),
         "templates": QuoteTemplate.objects.all(),
         "can_edit": request.user.can_edit(opp),
         "users": User.objects.filter(is_active=True),
@@ -390,7 +397,7 @@ def event_detail(request, pk):
     event = get_object_or_404(Event, pk=pk)
     companies = visible(Company, request.user).filter(event=event).select_related("owner").annotate(
         n_open=Count("opportunities", filter=Q(opportunities__stage__is_won=False, opportunities__stage__is_lost=False), distinct=True),
-        n_contacts=Count("contacts", distinct=True))
+        n_contacts=Count("contacts", distinct=True) + Count("extra_contacts", distinct=True))
     opps = visible(Opportunity, request.user).filter(company__event=event).select_related("company", "stage", "owner")
     return render(request, "crm/event.html", {
         "event": event, "companies": companies, "opps": opps,
@@ -405,7 +412,7 @@ def event_detail(request, pk):
 def company_list(request):
     base = visible(Company, request.user).select_related("owner").annotate(
         n_open=Count("opportunities", filter=Q(opportunities__stage__is_won=False, opportunities__stage__is_lost=False), distinct=True),
-        n_contacts=Count("contacts", distinct=True),
+        n_contacts=Count("contacts", distinct=True) + Count("extra_contacts", distinct=True),
     )
     flt = CompanyFilter(request.GET, queryset=base)
     page = Paginator(flt.qs.order_by("name"), 50).get_page(request.GET.get("page"))
@@ -418,9 +425,11 @@ def company_detail(request, pk):
     log_access(request, AccessLog.Action.VIEW, company)
     return render(request, "crm/company.html", {
         "company": company,
-        "contacts": company.contacts.all(),
+        # sus personas: las que la tienen como principal y las que también trabajan con ella
+        "contacts": Contact.objects.filter(Q(company=company) | Q(other_companies=company)).distinct()
+                    .select_related("company").prefetch_related("channels", "other_companies").order_by("-is_primary", "first_name"),
         "opps": visible(Opportunity, request.user).filter(company=company).select_related("stage", "owner"),
-        "tasks": company.tasks.filter(done_at__isnull=True).select_related("assignee", "opportunity"),
+        "tasks": company.tasks.filter(done_at__isnull=True).select_related("assignee", "opportunity").prefetch_related("assignees"),
         "timeline": company.activities.select_related("user", "contact", "opportunity")[:200],
         "subscriptions": company.subscriptions.select_related("product"),
         "hour_banks": company.hour_banks.select_related("product"),
@@ -443,6 +452,10 @@ def company_merge(request, pk, other_pk):
         raise Http404
     for rel in ("contacts", "opportunities", "activities", "tasks", "subscriptions", "hour_banks"):
         getattr(other, rel).update(company=company)
+    for contact in other.extra_contacts.all():  # quien también era de la otra pasa a serlo de esta
+        contact.other_companies.remove(other)
+        if contact.company_id != company.pk:
+            contact.other_companies.add(company)
     for field in ("tax_id", "website", "email", "phone", "address", "city", "province", "sector", "owner"):
         if not getattr(company, field) and getattr(other, field):
             setattr(company, field, getattr(other, field))
@@ -457,10 +470,48 @@ def company_merge(request, pk, other_pk):
 
 
 def contact_list(request):
-    flt = ContactFilter(request.GET, queryset=visible(Contact, request.user).select_related("company"))
+    flt = ContactFilter(request.GET, queryset=visible(Contact, request.user).select_related("company").prefetch_related("channels", "other_companies"))
     page = Paginator(flt.qs, 50).get_page(request.GET.get("page"))
     template = "crm/_contact_rows.html" if request.headers.get("HX-Request") and not request.headers.get("HX-Boosted") else "crm/contacts.html"
     return render(request, template, {"filter": flt, "page": page})
+
+
+def contact_detail(request, pk):
+    """Ficha de la persona: cómo localizarla, sus empresas, sus oportunidades y lo hablado con ella."""
+    user = request.user
+    contact = get_object_or_404(visible(Contact, user).select_related("company", "owner").prefetch_related("channels", "other_companies"), pk=pk)
+    log_access(request, AccessLog.Action.VIEW, contact)
+    return render(request, "crm/contact.html", {
+        "contact": contact,
+        "opps": visible(Opportunity, user).filter(contact=contact).select_related("stage", "company"),
+        "timeline": scope(Activity.objects.all(), user).filter(contact=contact).select_related("user", "company", "opportunity")[:100],
+        "can_edit": user.can_edit(contact) and not contact.erased_at,
+    })
+
+
+def _vcard_text(value):
+    return str(value or "").replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\r", "").replace("\n", "\\n")
+
+
+def contact_vcard(request, pk):
+    """Tarjeta .vcf: al abrirla, el móvil ofrece guardarla en su agenda."""
+    contact = get_object_or_404(visible(Contact, request.user).filter(erased_at__isnull=True).select_related("company").prefetch_related("channels"), pk=pk)
+    log_access(request, AccessLog.Action.EXPORT, contact)
+    t = _vcard_text
+    lines = ["BEGIN:VCARD", "VERSION:3.0", f"N:{t(contact.last_name)};{t(contact.first_name)};;;", f"FN:{t(contact.full_name)}"]
+    if contact.company_id:
+        lines.append(f"ORG:{t(contact.company.name)}")
+    if contact.position:
+        lines.append(f"TITLE:{t(contact.position)}")
+    for phone in contact.values("phone"):
+        number = re.sub(r"[^\d+]", "", (re.match(r"^[\s+\d().\-]+", phone) or [""])[0])
+        if number:
+            lines.append(f"TEL;TYPE={'CELL' if phone == contact.mobile else 'WORK'}:{number}")
+    lines += [f"EMAIL;TYPE=WORK:{t(email)}" for email in contact.values("email")]
+    lines.append("END:VCARD")
+    name = re.sub(r"[^\w\-]+", "-", contact.full_name).strip("-") or "contacto"
+    return HttpResponse("\r\n".join(lines) + "\r\n", content_type="text/vcard; charset=utf-8",
+                        headers={"Content-Disposition": f'attachment; filename="{name}.vcf"'})
 
 
 @require_POST
@@ -495,6 +546,7 @@ def activity_add(request):
         direction=request.POST.get("direction", "") if request.POST.get("direction") in ("in", "out") else "",
     )
     Company.objects.filter(pk=company.pk).update(updated_at=timezone.now())
+    mentions.notify(request.user, body, activity=activity)
     return render(request, "crm/_activity.html", {"a": activity, "show_opp": not opp})
 
 
@@ -526,10 +578,14 @@ def task_quick(request):
     company = opp.company if opp else visible(Company, request.user).filter(pk=request.POST.get("company") or 0).first()
     if not title:
         return refresh()
-    assignee = User.objects.filter(pk=request.POST.get("assignee") or 0, is_active=True).first() or request.user
+    # una o varias personas: la primera marcada es la responsable (quien la crea, si se ha marcado)
+    picked = [pk for pk in request.POST.getlist("assignee") if pk.isdigit()]
+    found = {str(u.pk): u for u in User.objects.filter(pk__in=picked, is_active=True)}
+    people = sorted((found[pk] for pk in dict.fromkeys(picked) if pk in found), key=lambda u: u != request.user) or [request.user]
     kind = request.POST.get("kind") if request.POST.get("kind") in Task.Kind.values else Task.Kind.TODO
-    Task.objects.create(title=title[:200], kind=kind, due_at=_parse_when(request.POST), assignee=assignee,
-                        created_by=request.user, opportunity=opp, company=company)
+    task = Task.objects.create(title=title[:200], kind=kind, due_at=_parse_when(request.POST), assignee=people[0],
+                               created_by=request.user, opportunity=opp, company=company)
+    task.assignees.set(people[1:])
     return refresh()
 
 
@@ -557,7 +613,7 @@ def task_list(request):
     params = request.GET.copy()
     if "assignee" not in params:
         params["assignee"] = str(request.user.pk)
-    base = visible(Task, request.user).select_related("assignee", "opportunity", "company")
+    base = visible(Task, request.user).select_related("assignee", "opportunity", "company").prefetch_related("assignees")
     flt = TaskFilter(params, queryset=base)
     tasks = flt.qs if params.get("when") else flt.qs.filter(done_at__isnull=True)
     return render(request, "crm/tasks.html", {"filter": flt, "tasks": tasks[:300], "when": params.get("when", ""), "now": timezone.now(),
@@ -572,7 +628,24 @@ def product_list(request):
     q = request.GET.get("q", "").strip()
     if q:
         products = products.filter(Q(name__icontains=q) | Q(code__icontains=q) | Q(description__icontains=q))
-    return render(request, "crm/products.html", {"products": products, "families": ProductFamily.objects.all(), "q": q})
+    return render(request, "crm/products.html", {"products": products, "families": ProductFamily.objects.all(), "q": q,
+                                                 "stripe_enabled": stripe.enabled()})
+
+
+@require_POST
+def stripe_sync(request):
+    """Trae de Stripe los precios mensual, anual y por usuario de los productos recurrentes."""
+    if not request.user.can_manage_catalog:
+        raise PermissionDenied
+    try:
+        result = stripe.sync()
+    except stripe.StripeError as err:
+        messages.error(request, f"Stripe: {err}")
+    else:
+        created = ", ".join(p.name for p in result["created"])
+        messages.success(request, f"Precios de Stripe al día: {len(result['updated'])} actualizados, {len(result['same'])} sin cambios"
+                                  + (f", nuevos: {created}." if created else ", ningún producto nuevo."))
+    return redirect("products")
 
 
 def subscription_list(request):
@@ -625,6 +698,28 @@ def ai_extract(request, kind):
         return JsonResponse({"error": "Pega primero el texto."}, status=400)
     try:
         return JsonResponse({"fields": ai.extract(kind, text)})
+    except ai.AIError as exc:
+        return JsonResponse({"error": str(exc)}, status=502)
+
+
+@require_POST
+def ai_lookup(request, kind):
+    """Rellena una ficha buscando en internet a partir de lo que ya hay escrito en el formulario (nombre, web, empresa…)."""
+    if kind not in ai.EXTRACT_FIELDS:
+        raise Http404
+    clues = {key: request.POST.get(key, "").strip()[:200] for key in ai.LOOKUP_CLUES[kind]}
+    if kind == "contact":
+        company = visible(Company, request.user).filter(pk=clues["company"]).first() if clues["company"].isdigit() else None
+        clues["company"] = company.name if company else request.POST.get("new_company", "").strip()[:200]
+        enough = clues["first_name"] and (clues["last_name"] or clues["company"] or clues["email"])
+        missing = "Escribe primero el nombre y los apellidos o la empresa."
+    else:
+        enough = clues["name"] or clues["website"]
+        missing = "Escribe primero el nombre o la web de la empresa."
+    if not enough:
+        return JsonResponse({"error": missing}, status=400)
+    try:
+        return JsonResponse(ai.lookup(kind, clues, request.POST.get("text", "").strip()))
     except ai.AIError as exc:
         return JsonResponse({"error": str(exc)}, status=502)
 
@@ -823,7 +918,7 @@ def teams_meeting(request, pk):
             Activity.objects.create(
                 company=opp.company, opportunity=opp, contact=contact, user=request.user, kind=Activity.Kind.MEETING, occurred_at=data["start"],
                 subject=f"Reunión de Teams convocada: {data['subject']}"[:250], source="teams", external_id=meeting["id"][:255],
-                body=f"Convocada desde {data['account'].email} para {', '.join(data['attendees'])}.\nEnlace: {meeting['join_url']}" + (f"\n\n{data['message']}" if data["message"] else ""))
+                body=f"Convocada desde {data['account'].email} para {', '.join(data['attendees'])}.\nDuración: {data['minutes']} min\nEnlace: {meeting['join_url']}" + (f"\n\n{data['message']}" if data["message"] else ""))
             Task.objects.create(title=f"Reunión de Teams: {data['subject']}"[:200], kind=Task.Kind.MEETING, due_at=data["start"], assignee=request.user,
                                 created_by=request.user, opportunity=opp, company=opp.company, notes=meeting["join_url"])
             log_access(request, AccessLog.Action.CREATE, opp, label="teams_meeting")
@@ -833,6 +928,43 @@ def teams_meeting(request, pk):
         "form": form, "title": "Reunión de Teams", "action": request.path, "submit": "Convocar", "wide": True,
         "hint": "Crea el evento con enlace de Teams en el calendario de la cuenta elegida. Microsoft envía la convocatoria a los asistentes; "
                 "en el CRM queda anotada en el historial y como próxima acción."})
+
+
+# ------------------------------------------------------------ NDA
+def nda_create(request, pk):
+    """Genera el acuerdo de confidencialidad con el cliente, en español o en inglés, a partir de la empresa y el contacto."""
+    opp = get_object_or_404(visible(Opportunity, request.user).select_related("company", "contact"), pk=pk)
+    editable_or_403(request.user, opp)
+    form = forms.NdaForm(request.POST or None, initial=services.nda_defaults(opp))
+    if request.method == "POST" and form.is_valid():
+        nda = services.create_nda(opp, request.user, form.cleaned_data)
+        log_access(request, AccessLog.Action.CREATE, nda)
+        messages.success(request, "NDA generado. Ábrelo desde la ficha para revisarlo y enviarlo a firmar.")
+        return refresh()
+    return render(request, "crm/_modal_form.html", {
+        "form": form, "title": f"NDA con {opp.company.name}", "action": request.path, "submit": "Generar PDF", "wide": True,
+        "hint": f"Acuerdo marco de confidencialidad entre {settings.NDA_ISSUER['name']} y el cliente, sometido a los tribunales de {settings.NDA_ISSUER['courts']['es']}. "
+                "Los datos salen de la empresa y del contacto del lead: revísalos, porque se imprimen tal cual."})
+
+
+@xframe_options_sameorigin
+def nda_pdf(request, pk):
+    nda = get_object_or_404(scope(Nda.objects.all(), request.user), pk=pk)
+    if not nda.pdf:
+        raise Http404
+    log_access(request, AccessLog.Action.VIEW, nda)
+    return FileResponse(nda.pdf.open("rb"), content_type="application/pdf", filename=nda.filename)
+
+
+@require_POST
+def nda_delete(request, pk):
+    nda = get_object_or_404(scope(Nda.objects.select_related("opportunity"), request.user), pk=pk)
+    editable_or_403(request.user, nda.opportunity)
+    log_access(request, AccessLog.Action.DELETE, nda)
+    opportunity = nda.opportunity_id
+    nda.pdf.delete(save=False)
+    nda.delete()
+    return redirect("opportunity", pk=opportunity)
 
 
 # ------------------------------------------------------------ App Android
@@ -853,7 +985,48 @@ def apk_download(request):
                         content_type="application/vnd.android.package-archive")
 
 
+# ------------------------------------------------------------------ Avisos
+def notification_list(request):
+    """Menciones recibidas. Abrir una la marca como leída."""
+    items = Notification.objects.filter(recipient=request.user).select_related("actor", "company", "opportunity", "task")
+    return render(request, "crm/notifications.html", {"page": Paginator(items, 30).get_page(request.GET.get("page"))})
+
+
+def notification_open(request, pk):
+    note = get_object_or_404(Notification, pk=pk, recipient=request.user)
+    if not note.read_at:
+        note.read_at = timezone.now()
+        note.save(update_fields=["read_at"])
+    return redirect(note.url or "notifications")
+
+
+@require_POST
+def notification_read_all(request):
+    Notification.objects.filter(recipient=request.user, read_at__isnull=True).update(read_at=timezone.now())
+    return redirect("notifications")
+
+
 # ------------------------------------------------------------- Buscadores
+def search(request):
+    """Buscador único: oportunidades, empresas y personas a la vez."""
+    user, q = request.user, request.GET.get("q", "").strip()
+    found = {}
+    if len(q) >= 2:
+        found = {
+            "opps": visible(Opportunity, user).filter(Q(title__icontains=q) | Q(company__name__icontains=q)).select_related("company", "stage").order_by("stage__is_won", "stage__is_lost", "-updated_at")[:10],
+            "companies": CompanyFilter({"q": q}, queryset=visible(Company, user)).qs.order_by("name")[:10],
+            "contacts": ContactFilter({"q": q}, queryset=visible(Contact, user).filter(erased_at__isnull=True).select_related("company").prefetch_related("channels", "other_companies")).qs[:10],
+        }
+    template = "crm/_search_results.html" if request.headers.get("HX-Request") and not request.headers.get("HX-Boosted") else "crm/search.html"
+    return render(request, template, {"q": q, **found})
+
+
+def share(request):
+    """Texto compartido desde otra app del móvil (una firma de correo, una web…): de ahí sale una ficha."""
+    parts = [request.GET.get(key, "").strip() for key in ("title", "text", "url")]
+    return render(request, "crm/share.html", {"text": "\n".join(dict.fromkeys(p for p in parts if p))[:6000], "ai_enabled": ai.enabled()})
+
+
 def lookup(request, kind):
     """Resultados para los desplegables con buscador de empresa y contacto."""
     q = request.GET.get("q", "").strip()
@@ -863,14 +1036,23 @@ def lookup(request, kind):
             found = found.filter(Q(name__icontains=q) | Q(tax_id__icontains=q.replace(" ", "")) | Q(domain__icontains=q))
         results = [{"id": c.pk, "label": c.name, "sub": " · ".join(part for part in (c.city, c.tax_id) if part)} for c in found.order_by("name")[:12]]
     elif kind == "contact":
-        found = visible(Contact, request.user).filter(erased_at__isnull=True).select_related("company")
+        found = visible(Contact, request.user).filter(erased_at__isnull=True).select_related("company").prefetch_related("other_companies")
         if request.GET.get("company", "").isdigit():
-            found = found.filter(company_id=request.GET["company"])
+            company_id = request.GET["company"]
+            found = found.filter(Q(company_id=company_id) | Q(other_companies=company_id))
         for word in q.split():
-            found = found.filter(Q(first_name__icontains=word) | Q(last_name__icontains=word) | Q(email__icontains=word) | Q(company__name__icontains=word))
-        results = [{"id": c.pk, "label": str(c), "sub": " · ".join(part for part in (c.company.name if c.company_id else "", c.email) if part),
+            found = found.filter(Q(first_name__icontains=word) | Q(last_name__icontains=word) | Q(email__icontains=word) | Q(company__name__icontains=word)
+                                 | Q(other_companies__name__icontains=word) | Q(channels__value__icontains=word))
+        results = [{"id": c.pk, "label": str(c), "sub": " · ".join(part for part in (", ".join(x.name for x in c.companies()), c.email) if part),
                     "company": {"id": c.company_id, "label": c.company.name} if c.company_id else None}
-                   for c in found.order_by("first_name", "last_name")[:12]]
+                   for c in found.distinct().order_by("first_name", "last_name")[:12]]
+    elif kind == "user":  # para mencionar con @ en notas y tareas
+        found = User.objects.filter(is_active=True)
+        for word in q.split():
+            found = found.filter(Q(name__icontains=word) | Q(email__icontains=word))
+        results = [{"id": u.pk, "label": u.name or u.email, "handle": mentions.handle(u), "sub": u.email} for u in found[:8]]
+        if mentions.EVERYONE.startswith(q.lower()):  # «@todos»: quienes llevan el lead, su empresa y su contacto
+            results.insert(0, {"id": 0, "label": "Todos los implicados", "handle": mentions.EVERYONE, "sub": "Responsables del lead, la empresa y el contacto, y asignados"})
     else:
         raise Http404
     return JsonResponse({"results": results})
@@ -906,7 +1088,7 @@ MODALS = {
     "incentive_pm": (incentive_forms.PmIncentiveForm, "incentivo de PM", lambda u: u.can_manage_incentives, lambda u, o: u.can_manage_incentives),
     "prodyear": (incentive_forms.ProductivityYearForm, "ejercicio de productividad", lambda u: u.can_manage_incentives, lambda u, o: u.can_manage_incentives),
     "prodscore": (incentive_forms.ProductivityScoreForm, "nota de productividad", lambda u: u.can_manage_incentives, lambda u, o: u.can_manage_incentives),
-    # ferias y eventos: solo los roles que los gestionan (por defecto, Responsable Comercial)
+    # ferias y eventos: solo los roles que los gestionan (por defecto, CEO, Director y Responsable Comercial)
     "event": (forms.EventForm, "feria o evento", lambda u: u.can_manage_events, lambda u, o: u.can_manage_events),
 }
 # registros de negocio: borrar exige además el permiso de borrado del rol
@@ -962,8 +1144,17 @@ def modal_form(request, kind, pk=None):
             obj.set_unusable_password()
         if kind == "user":
             obj.is_staff = obj.is_superuser
+        lead_before = history.snapshot(Opportunity.objects.get(pk=instance.pk)) if kind == "opportunity" and instance else None
+        before = {"activity": "body", "task": "notes"}.get(kind)
+        previous = getattr(form_class._meta.model.objects.filter(pk=instance.pk).first(), before, "") if instance and before else ""
         obj.save()
         form.save_m2m()
+        if before:
+            mentions.notify(user, getattr(obj, before), previous=previous, **{kind: obj})
+        if kind == "opportunity":
+            history.record(user, obj, lead_before)
+        if kind == "line" and (not instance or form.has_changed()):
+            history.record_line(user, obj, "cambiada" if instance else "añadida")
         log_access(request, AccessLog.Action.UPDATE if instance else AccessLog.Action.CREATE, obj)
         for created, event in ((getattr(form, "created_company", None), "company"), (getattr(form, "created_contact", None), "contact")):
             if created:  # empresa o contacto dados de alta desde el propio diálogo de oportunidad o de contacto
@@ -987,6 +1178,8 @@ def modal_form(request, kind, pk=None):
         "erase_url": reverse("contact_erase", args=[pk]) if can_remove and kind == "contact" and not instance.erased_at else None,
         "wide": kind in ("company", "contact", "opportunity", "product", "quotetemplate", "incentive_sales", "incentive_quota", "incentive_pm", "prodyear"),
         "ai_kind": kind if kind in ai.EXTRACT_FIELDS and ai.enabled() else None,
+        "pick_contact": kind == "contact" and not instance,  # en el móvil, traer los datos de su agenda
+        "is_new": not instance,
     })
 
 
@@ -1007,7 +1200,10 @@ def modal_delete(request, kind, pk):
     elif kind == "event":
         target = reverse("events")
     try:
-        obj.delete()
+        with transaction.atomic():
+            if kind == "line":
+                history.record_line(user, obj, "quitada")
+            obj.delete()
     except Exception:  # ProtectedError: tiene registros que dependen de él
         return HttpResponse("No se puede borrar: hay registros que dependen de este elemento.", status=409)
     return go(target) if target else refresh()

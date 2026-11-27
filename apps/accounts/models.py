@@ -108,6 +108,16 @@ class User(AbstractBaseUser, PermissionsMixin):
         return self.is_superuser or bool(self.role and self.role.view_scope == Role.Scope.ALL)
 
     @property
+    def leads_team(self):
+        """CEO, Director y Responsable Comercial: siguen la actividad de todo el equipo, cambios de leads incluidos."""
+        return self.is_superuser or bool(self.role and self.role.code in ("ceo", "director", "responsable-comercial"))
+
+    @property
+    def is_management(self):
+        """CEO y Director: además ven las últimas empresas y contactos dados de alta."""
+        return self.is_superuser or bool(self.role and self.role.code in ("ceo", "director"))
+
+    @property
     def edits_all(self):
         return self.is_superuser or bool(self.role and self.role.edit_scope == Role.Scope.ALL)
 

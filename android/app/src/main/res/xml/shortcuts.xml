@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Accesos directos al mantener pulsado el icono. Abren la app ya en el alta (la web lee «?nuevo=»).
+     El dominio va escrito aquí: este fichero no admite variables; si cambia CRM_HOST, cámbialo también. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:shortcutId="search" android:enabled="true" android:icon="@drawable/sc_search"
+        android:shortcutShortLabel="@string/sc_search" android:shortcutLongLabel="@string/sc_search">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="org.qopencrm.app"
+            android:targetClass="com.google.androidbrowserhelper.trusted.LauncherActivity" android:data="https://crm.example.com/busqueda/" />
+    </shortcut>
+    <shortcut android:shortcutId="company" android:enabled="true" android:icon="@drawable/sc_company"
+        android:shortcutShortLabel="@string/sc_company" android:shortcutLongLabel="@string/sc_company">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="org.qopencrm.app"
+            android:targetClass="com.google.androidbrowserhelper.trusted.LauncherActivity" android:data="https://crm.example.com/cuentas/?nuevo=company" />
+    </shortcut>
+    <shortcut android:shortcutId="contact" android:enabled="true" android:icon="@drawable/sc_contact"
+        android:shortcutShortLabel="@string/sc_contact" android:shortcutLongLabel="@string/sc_contact">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="org.qopencrm.app"
+            android:targetClass="com.google.androidbrowserhelper.trusted.LauncherActivity" android:data="https://crm.example.com/contactos/?nuevo=contact" />
+    </shortcut>
+    <shortcut android:shortcutId="lead" android:enabled="true" android:icon="@drawable/sc_lead"
+        android:shortcutShortLabel="@string/sc_lead" android:shortcutLongLabel="@string/sc_lead">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="org.qopencrm.app"
+            android:targetClass="com.google.androidbrowserhelper.trusted.LauncherActivity" android:data="https://crm.example.com/pipeline/?nuevo=opportunity" />
+    </shortcut>
+</shortcuts>

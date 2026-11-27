@@ -92,10 +92,26 @@ def _app_token():
     return _token(scope="https://graph.microsoft.com/.default", grant_type="client_credentials")["access_token"]
 
 
+def _token_roles(token):
+    """Permisos de aplicación que lleva el token (reclamación «roles»); None si el token no se puede leer."""
+    try:
+        payload = token.split(".")[1]
+        return json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4))).get("roles") or []
+    except (IndexError, ValueError):
+        return None
+
+
 def add_mailbox(owner, email, shared=False):
     """Da de alta un buzón para convocar con permisos de aplicación, comprobando antes que la aplicación llega a su calendario."""
     email = email.strip().lower()
-    _request(f"{GRAPH}/users/{urllib.parse.quote(email)}/calendar?$select=name", token=_app_token())
+    token = _app_token()
+    roles = _token_roles(token)
+    if roles is not None and "Calendars.ReadWrite" not in roles:
+        raise MicrosoftError(
+            "la aplicación de Microsoft 365 no tiene el permiso de aplicación «Calendars.ReadWrite» con consentimiento de administrador, "
+            "así que no puede usar buzones sin inicio de sesión. Concédelo en Entra (Permisos de API → Microsoft Graph → Permisos de aplicación) "
+            "o usa «Conectar mi cuenta», que solo necesita los permisos delegados.")
+    _request(f"{GRAPH}/users/{urllib.parse.quote(email)}/calendar?$select=name", token=token)
     account, _ = MicrosoftAccount.objects.update_or_create(owner=owner, email=email, defaults={"shared": shared, "refresh_token_enc": ""})
     return account
 

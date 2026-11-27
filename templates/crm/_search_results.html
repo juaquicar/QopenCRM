@@ -1,0 +1,16 @@
+{% load crm %}
+<div id="results" class="stack">
+{% if not q or q|length < 2 %}<div class="empty">Escribe al menos dos letras: busca a la vez en oportunidades, empresas y contactos.</div>
+{% elif not opps and not companies and not contacts %}<div class="empty">Nada con «{{ q }}».</div>
+{% else %}
+  {% if opps %}<section class="card"><h2>Oportunidades</h2>
+    {% for o in opps %}<a class="item" href="{% url 'opportunity' o.pk %}"><i class="ico" style="color:{{ o.stage.color }}">{% icon "board" %}</i><div class="grow"><b>{{ o.title }}</b><div class="muted small truncate">{{ o.company }} · {{ o.stage }}</div></div>{% icon "chevron" %}</a>{% endfor %}
+  </section>{% endif %}
+  {% if companies %}<section class="card"><h2>Empresas</h2>
+    {% for c in companies %}<a class="item" href="{% url 'company' c.pk %}"><span class="avatar av" style="--h:{{ c.name|hue }}">{{ c.name|initials }}</span><div class="grow"><b>{{ c.name }}</b><div class="muted small truncate">{{ c.get_kind_display }}{% if c.city %} · {{ c.city }}{% endif %}</div></div>{% icon "chevron" %}</a>{% endfor %}
+  </section>{% endif %}
+  {% if contacts %}<section class="card"><h2>Contactos</h2>
+    {% for c in contacts %}<a class="item" href="{% url 'contact' c.pk %}"><span class="avatar av" style="--h:{{ c.full_name|hue }}">{{ c.full_name|initials }}</span><div class="grow"><b>{{ c.full_name }}</b><div class="muted small truncate">{{ c.position }}{% if c.position and c.company_id %} · {% endif %}{{ c.company|default:"" }}</div></div>{% icon "chevron" %}</a>{% endfor %}
+  </section>{% endif %}
+{% endif %}
+</div>

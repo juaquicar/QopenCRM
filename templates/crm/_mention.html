@@ -1,0 +1,5 @@
+{% load crm %}<a class="task mention-row{% if not n.read_at %} unread{% endif %}" href="{% url 'notification_open' n.pk %}">
+    <div class="grow"><b>{{ n.actor|default:"Alguien" }}</b> te ha mencionado {% if n.task_id %}en una tarea{% else %}en una nota{% endif %}{% if n.opportunity or n.company %} sobre <b>{{ n.opportunity|default:n.company }}</b>{% endif %}
+      <div class="body muted">{{ n.text|truncatechars:280|mentions }}</div>
+      <div class="meta"><span>{{ n.created_at|due }}</span>{% if not n.read_at %}<span class="chip">Nueva</span>{% endif %}</div></div>
+  </a>

@@ -1,7 +1,7 @@
 {% extends "base.html" %}{% load crm %}
 {% block title %}Tareas · QopenCRM{% endblock %}
 {% block content %}
-<div class="page-head">
+<div class="page-head hide-m">
   <div><span class="eyebrow">Recordatorios</span><h1 style="margin-top:8px">Tareas</h1></div>
   <button class="btn" data-modal="{% url 'modal_new' 'task' %}">{% icon "plus" %}Tarea</button>
 </div>
@@ -18,4 +18,3 @@
 </form>
 <section class="card">{% for t in tasks %}{% include "crm/_task.html" with show_context=1 %}{% empty %}<div class="empty">Nada por aquí.</div>{% endfor %}</section>
 {% endblock %}
-{% block fab %}<button class="fab" data-modal="{% url 'modal_new' 'task' %}" aria-label="Nueva tarea">+</button>{% endblock %}

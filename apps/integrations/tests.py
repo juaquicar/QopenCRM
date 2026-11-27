@@ -69,6 +69,7 @@ class MailCaptureTests(TestCase):
         self.assertIn("Teams", activity.body)
 
 
+import json
 from unittest import mock
 
 from apps.integrations import ai
@@ -95,6 +96,40 @@ class AssistantTests(TestCase):
         url, headers, payload = post.call_args.args
         self.assertEqual((url, headers["Authorization"], payload["model"]), ("https://api.openai.com/v1/chat/completions", "Bearer clave-de-prueba", "gpt-4o-mini"))
         self.assertEqual(payload["messages"][1]["content"], "Marta · CTO · marta@acme.es")
+
+    def test_fill_form_searching_the_internet(self):
+        from apps.crm.models import Company
+
+        self.client.force_login(self.user)
+        self.assertContains(self.client.get("/m/company/"), "Buscar en internet")
+        self.assertEqual(self.client.post("/ia/internet/company/", {"name": ""}).status_code, 400)
+        self.assertEqual(self.client.post("/ia/internet/contact/", {"first_name": "Marta"}).status_code, 400)
+        found = {"name": "Acme Fibra, S.L.", "tax_id": "B12345678", "city": "Sevilla", "source": "https://www.acme.es/aviso-legal", "ceo": "x"}
+        reply = {"output": [{"type": "web_search_call"}, {"type": "message", "content": [{"type": "output_text", "text": "```json\n" + json.dumps(found) + "\n```"}]}]}
+        with mock.patch.object(ai, "_post", return_value=reply) as post:
+            response = self.client.post("/ia/internet/company/", {"name": "Acme Fibra", "website": "acme.es", "notes": "no se envía", "text": "operador de Sevilla"})
+        self.assertEqual(response.json(), {"fields": {"name": "Acme Fibra, S.L.", "tax_id": "B12345678", "city": "Sevilla"}, "source": "https://www.acme.es/aviso-legal"})
+        url, _, payload = post.call_args.args
+        self.assertEqual((url, payload["tools"]), ("https://api.openai.com/v1/responses", [{"type": "web_search"}]))
+        self.assertIn("nombre: Acme Fibra\nweb: acme.es", payload["input"])
+        self.assertIn("operador de Sevilla", payload["input"])
+        self.assertNotIn("no se envía", payload["input"])
+        # contacto: la empresa elegida viaja por su nombre, no por su id
+        company = Company.objects.create(name="Redes del Sur")
+        with mock.patch.object(ai, "_post", return_value={"output": [{"type": "message", "content": [{"type": "output_text", "text": '{"position": "CTO"}'}]}]}) as post:
+            response = self.client.post("/ia/internet/contact/", {"first_name": "Marta", "last_name": "Ruiz", "company": company.pk})
+        self.assertEqual(response.json(), {"fields": {"position": "CTO"}, "source": ""})
+        self.assertIn("empresa: Redes del Sur", post.call_args.args[2]["input"])
+
+    def test_internet_search_with_anthropic_resumes_paused_turn(self):
+        paused = {"stop_reason": "pause_turn", "content": [{"type": "server_tool_use", "id": "srvtoolu_1", "name": "web_search", "input": {"query": "Acme"}}]}
+        done = {"stop_reason": "end_turn", "content": [{"type": "text", "text": "Voy a buscar {la web}."}, {"type": "web_search_tool_result", "content": []},
+                                                        {"type": "text", "text": '{"name": "Acme", "source": "ftp://x"}'}]}
+        with self.settings(AI_PROVIDER="anthropic"), mock.patch.object(ai, "_post", side_effect=[paused, done]) as post:
+            self.assertEqual(ai.lookup("company", {"name": "Acme"}), {"fields": {"name": "Acme"}, "source": ""})
+        first, second = (call.args[2] for call in post.call_args_list)
+        self.assertEqual(first["tools"][0]["name"], "web_search")
+        self.assertEqual(second["messages"][1], {"role": "assistant", "content": paused["content"]})
 
     def test_natural_language_search(self):
         self.client.force_login(self.user)
@@ -152,6 +187,8 @@ class McpTests(TestCase):
     def test_handshake_and_auth(self):
         self.assertEqual(self.rpc(None, "initialize").status_code, 401)
         self.assertEqual(self.client.get("/mcp/").status_code, 405)
+        # la URL sin barra final responde igual, sin redirección (un POST redirigido no lo sigue el conector)
+        self.assertEqual(self.client.post("/mcp", data="{}", content_type="application/json").status_code, 401)
         answer = self.rpc(self.ana, "initialize", {"protocolVersion": "2025-03-26"}).json()["result"]
         self.assertEqual((answer["protocolVersion"], answer["serverInfo"]["name"]), ("2025-03-26", "QopenCRM"))
         self.assertEqual(self.rpc(self.ana, "initialize", {"protocolVersion": "1999-01-01"}).json()["result"]["protocolVersion"], "2025-06-18")
@@ -462,6 +499,22 @@ class TeamsAppMailboxTests(TestCase):
         cls.ana = User.objects.create_user("ana@example.com", name="Ana Ventas", role=Role.objects.get(code="comercial"))
         company = Company.objects.create(name="Fibra Acme", owner=cls.ana)
         cls.opp = Opportunity.objects.create(title="Demo", company=company, stage=Stage.objects.first(), owner=cls.ana)
+
+    def test_mailbox_needs_application_permission(self):
+        import base64
+        from unittest import mock
+
+        from apps.integrations.models import MicrosoftAccount
+
+        self.client.force_login(self.boss)
+        self.client.post("/ajustes/microsoft/", {"tenant_id": "t", "client_id": "c", "client_secret": "s"})
+        claims = base64.urlsafe_b64encode(json.dumps({"app_displayname": "CRM"}).encode()).decode().rstrip("=")
+        with mock.patch("apps.integrations.microsoft._request", return_value={"access_token": f"x.{claims}.y"}) as request:
+            page = self.client.post("/ajustes/microsoft/buzon/", {"email": "info@example.onmicrosoft.com", "owner": ""}, follow=True)
+        self.assertContains(page, "no tiene el permiso de aplicación «Calendars.ReadWrite»")
+        self.assertContains(page, "Conectar mi cuenta")
+        self.assertEqual(request.call_count, 1)  # no llega a preguntar a Graph por el calendario
+        self.assertFalse(MicrosoftAccount.objects.exists())
 
     def test_add_mailbox_and_convene_with_app_token(self):
         from unittest import mock

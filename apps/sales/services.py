@@ -8,13 +8,13 @@ from django.core.files.base import ContentFile
 from django.core.mail import EmailMessage
 from django.db import transaction
 from django.template.loader import render_to_string
-from django.utils import timezone
+from django.utils import timezone, translation
 
 from apps.catalog.models import BillingModel
 from apps.crm.models import Activity, Company, OpportunityLine
 from apps.integrations.webhooks import emit
 
-from .models import ISSUER_ADDRESS, ISSUER_FOOTER, ISSUER_NAME, HourBank, Quote, QuoteTemplate, Subscription, SubscriptionEvent
+from .models import ISSUER_ADDRESS, ISSUER_FOOTER, ISSUER_NAME, HourBank, Nda, Quote, QuoteTemplate, Subscription, SubscriptionEvent
 
 
 def _next_renewal(start, period):
@@ -233,3 +233,56 @@ def render_quote_pdf(quote):
         "logo": quote_logo(), "fonts": Path(settings.BASE_DIR) / "docker" / "fonts",
     })
     return HTML(string=html, base_url=str(settings.BASE_DIR)).write_pdf()
+
+
+# ------------------------------------------------------------ NDA
+# Los países se guardan en español en la ficha de la empresa; el acuerdo en inglés los necesita traducidos.
+COUNTRIES_EN = {
+    "españa": "Spain", "alemania": "Germany", "francia": "France", "portugal": "Portugal", "italia": "Italy", "reino unido": "the United Kingdom",
+    "irlanda": "Ireland", "países bajos": "the Netherlands", "holanda": "the Netherlands", "bélgica": "Belgium", "suiza": "Switzerland",
+    "austria": "Austria", "polonia": "Poland", "suecia": "Sweden", "noruega": "Norway", "dinamarca": "Denmark", "finlandia": "Finland",
+    "grecia": "Greece", "rumanía": "Romania", "andorra": "Andorra", "marruecos": "Morocco", "estados unidos": "the United States",
+    "eeuu": "the United States", "méxico": "Mexico", "colombia": "Colombia", "chile": "Chile", "perú": "Peru", "argentina": "Argentina",
+    "brasil": "Brazil", "ecuador": "Ecuador", "república dominicana": "the Dominican Republic", "panamá": "Panama", "uruguay": "Uruguay",
+}
+
+
+def nda_defaults(opportunity):
+    """Datos de la otra parte tal como están en la empresa y el contacto de la oportunidad."""
+    company, contact = opportunity.company, opportunity.contact
+    place = [company.address, company.city, company.province if company.province != company.city else ""]
+    if company.country and company.country.strip().lower() != "españa":
+        place.append(company.country)
+    return {
+        "party_name": company.name, "party_address": ", ".join(part.strip() for part in place if part and part.strip()),
+        "party_tax_id": company.tax_id, "party_country": company.country,
+        "signer_name": str(contact) if contact else "", "signer_position": contact.position if contact else "",
+        "signed_on": timezone.localdate(),
+    }
+
+
+def render_nda_pdf(nda):
+    from weasyprint import HTML
+
+    lang = nda.language
+    country = nda.party_country.strip()
+    if lang == "en":
+        country = COUNTRIES_EN.get(country.lower(), country)
+    with translation.override(lang):  # el nombre del mes sale en el idioma del acuerdo
+        html = render_to_string(f"sales/nda_{lang}.html", {
+            "nda": nda, "country": country,
+            "issuer": {**settings.NDA_ISSUER, **{key: settings.NDA_ISSUER[key][lang] for key in ("address", "position", "courts")}},
+            "logo": quote_logo(), "fonts": Path(settings.BASE_DIR) / "docker" / "fonts",
+        })
+    return HTML(string=html, base_url=str(settings.BASE_DIR)).write_pdf()
+
+
+@transaction.atomic
+def create_nda(opportunity, user, data):
+    nda = Nda(opportunity=opportunity, created_by=user, **data)
+    nda.pdf.save(f"nda-{opportunity.pk}-{nda.language}-{timezone.now():%Y%m%d%H%M%S}.pdf", ContentFile(render_nda_pdf(nda)), save=True)
+    Activity.objects.create(
+        company=opportunity.company, opportunity=opportunity, user=user, kind=Activity.Kind.SYSTEM,
+        subject=f"NDA generado en {nda.get_language_display().lower()} para {nda.party_name}"[:250],
+    )
+    return nda
